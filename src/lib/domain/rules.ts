@@ -1,0 +1,109 @@
+import type {
+  FestivalSnapshot,
+  Signal,
+  SignalInput,
+} from "./types";
+
+export class FestivalRuleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FestivalRuleError";
+  }
+}
+
+export function remainingWallet(
+  personId: string,
+  snapshot: FestivalSnapshot,
+): number {
+  const person = snapshot.people.find((item) => item.id === personId);
+
+  if (!person) {
+    return 0;
+  }
+
+  const spent = snapshot.signals
+    .filter((signal) => signal.investorId === personId)
+    .reduce((sum, signal) => sum + signal.amount, 0);
+
+  return person.walletBudget - spent;
+}
+
+export function isOwnTeam(
+  personId: string,
+  teamId: string,
+  snapshot: FestivalSnapshot,
+): boolean {
+  return snapshot.teamMembers.some(
+    (membership) =>
+      membership.personId === personId && membership.teamId === teamId,
+  );
+}
+
+export function validateSignal(
+  input: SignalInput,
+  snapshot: FestivalSnapshot,
+): SignalInput {
+  if (snapshot.event.status !== "open") {
+    throw new FestivalRuleError("Investovanie je zatvorené.");
+  }
+
+  const investor = snapshot.people.find(
+    (person) => person.id === input.investorId,
+  );
+  const team = snapshot.teams.find(
+    (candidate) => candidate.id === input.teamId && !candidate.archived,
+  );
+
+  if (!investor || !team) {
+    throw new FestivalRuleError("Tím alebo človek už nie je dostupný.");
+  }
+
+  if (isOwnTeam(input.investorId, input.teamId, snapshot)) {
+    throw new FestivalRuleError("Do vlastného tímu investovať nemôžeš.");
+  }
+
+  if (!Number.isInteger(input.amount) || input.amount < 0) {
+    throw new FestivalRuleError("Suma musí byť celé nezáporné číslo.");
+  }
+
+  if (input.amount > snapshot.event.maxPerTeam) {
+    throw new FestivalRuleError(
+      `Do jedného tímu môžeš dať najviac ${snapshot.event.currency}${snapshot.event.maxPerTeam}.`,
+    );
+  }
+
+  const hasText = input.feedbackText.trim().length > 0;
+  const hasAudio = Boolean(input.audioPath?.trim());
+
+  if (!hasText && !hasAudio) {
+    throw new FestivalRuleError("Pridaj feedback alebo hlasovú poznámku.");
+  }
+
+  const existing = snapshot.signals.find(
+    (signal) =>
+      signal.investorId === input.investorId &&
+      signal.teamId === input.teamId,
+  );
+  const available = remainingWallet(input.investorId, snapshot)
+    + (existing?.amount ?? 0);
+
+  if (input.amount > available) {
+    throw new FestivalRuleError("Nemáš dosť kreditu.");
+  }
+
+  return {
+    ...input,
+    feedbackText: input.feedbackText.trim(),
+    audioPath: input.audioPath?.trim() || null,
+  };
+}
+
+export function canEditSignal(
+  signal: Signal,
+  personId: string,
+  snapshot: FestivalSnapshot,
+): boolean {
+  return (
+    snapshot.event.status === "open" && signal.investorId === personId
+  );
+}
