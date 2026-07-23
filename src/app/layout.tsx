@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, Space_Grotesk } from "next/font/google";
+import { FestivalProvider } from "@/lib/repository/repository-context";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({
@@ -31,7 +32,9 @@ export default function RootLayout({
       lang="sk"
       className={`${instrumentSans.variable} ${spaceGrotesk.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <FestivalProvider>{children}</FestivalProvider>
+      </body>
     </html>
   );
 }
