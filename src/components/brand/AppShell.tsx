@@ -4,7 +4,7 @@ import { Stripes } from "./Stripes";
 
 type AppShellProps = {
   children: ReactNode;
-  mode?: "demo" | "live";
+  mode?: "demo" | "live" | "supabase";
 };
 
 export function AppShell({ children, mode = "live" }: AppShellProps) {
