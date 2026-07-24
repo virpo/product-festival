@@ -1,7 +1,7 @@
 "use client";
 
 import { Mic, Pause, Play, RotateCcw, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type RecorderState = "idle" | "requesting" | "recording" | "recorded" | "error";
 
@@ -17,7 +17,10 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const audioUrl = value ? URL.createObjectURL(value) : null;
+  const audioUrl = useMemo(
+    () => (value ? URL.createObjectURL(value) : null),
+    [value],
+  );
 
   useEffect(() => {
     if (state !== "recording") {
@@ -30,7 +33,12 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
 
   useEffect(
     () => () => {
-      recorderRef.current?.stop();
+      if (
+        recorderRef.current &&
+        recorderRef.current.state !== "inactive"
+      ) {
+        recorderRef.current.stop();
+      }
       streamRef.current?.getTracks().forEach((track) => track.stop());
     },
     [],

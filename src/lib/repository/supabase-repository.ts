@@ -339,10 +339,11 @@ export class SupabaseFestivalRepository implements FestivalRepository {
   }
 
   async touchPresence(personId: string): Promise<void> {
-    const { error } = await this.client
-      .from("people")
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq("id", personId);
+    void personId;
+    const event = await this.getEvent();
+    const { error } = await this.client.rpc("touch_presence", {
+      target_event_id: event.id,
+    });
     fail(error, "Prítomnosť sa nepodarilo uložiť.");
   }
 
@@ -488,7 +489,9 @@ export class SupabaseFestivalRepository implements FestivalRepository {
   }
 
   async removePerson(personId: string): Promise<void> {
-    const { error } = await this.client.from("people").delete().eq("id", personId);
+    const { error } = await this.client.rpc("remove_person", {
+      target_person_id: personId,
+    });
     fail(error, "Človeka sa nepodarilo odstrániť.");
   }
 

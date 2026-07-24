@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { remainingWallet } from "@/lib/domain/rules";
 import { DemoFestivalRepository } from "./demo-repository";
 import type { StorageLike } from "./FestivalRepository";
 
@@ -76,5 +77,57 @@ describe("DemoFestivalRepository", () => {
     await repo.advanceEvent("released");
 
     expect((await repo.getSnapshot()).event.status).toBe("released");
+  });
+
+  it("runs the participant flow through edit, lock, and release", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const team = (await repo.getSnapshot()).teams.find(
+      (candidate) => candidate.code === "LEDGER8",
+    )!;
+
+    await repo.markVisit(person.id, team.id);
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 37,
+      feedbackText: "The result makes sense. Shorten the first screen.",
+      audioPath: null,
+    });
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 38,
+      feedbackText: "The result makes sense. Shorten the first screen.",
+      audioPath: null,
+    });
+
+    const openSnapshot = await repo.getSnapshot();
+    expect(
+      openSnapshot.visits.some(
+        (visit) => visit.personId === person.id && visit.teamId === team.id,
+      ),
+    ).toBe(true);
+    expect(
+      openSnapshot.signals.find(
+        (signal) =>
+          signal.investorId === person.id && signal.teamId === team.id,
+      ),
+    ).toMatchObject({ amount: 38 });
+    expect(remainingWallet(person.id, openSnapshot)).toBe(47);
+
+    await repo.advanceEvent("locked");
+    await expect(
+      repo.upsertSignal({
+        investorId: person.id,
+        teamId: team.id,
+        amount: 39,
+        feedbackText: "Too late.",
+        audioPath: null,
+      }),
+    ).rejects.toThrow("Investovanie je zatvorené.");
+
+    await repo.advanceEvent("released");
+    expect((await repo.getSnapshot()).event.resultsReleasedAt).not.toBeNull();
   });
 });

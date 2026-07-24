@@ -277,6 +277,19 @@ begin
 end;
 $$;
 
+create or replace function public.touch_presence(target_event_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.people
+  set last_seen_at = now()
+  where event_id = target_event_id and auth_user_id = auth.uid();
+end;
+$$;
+
 create or replace function public.advance_event(
   target_event_id uuid,
   target_status public.event_status
@@ -469,6 +482,33 @@ begin
   else
     delete from public.teams where id = target_team_id;
   end if;
+end;
+$$;
+
+create or replace function public.remove_person(target_person_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_event_id uuid;
+begin
+  select event_id into target_event_id
+  from public.people
+  where id = target_person_id;
+
+  if not public.is_organizer(target_event_id) then
+    raise exception 'Organizer access required.';
+  end if;
+
+  if exists (
+    select 1 from public.signals where investor_id = target_person_id
+  ) then
+    raise exception 'A person with feedback cannot be removed.';
+  end if;
+
+  delete from public.people where id = target_person_id;
 end;
 $$;
 
@@ -691,11 +731,11 @@ on public.people for insert
 to authenticated
 with check (public.is_organizer(event_id));
 
-create policy people_update_organizer_or_self
+create policy people_update_organizer
 on public.people for update
 to authenticated
-using (public.is_organizer(event_id) or id = public.current_person_id(event_id))
-with check (public.is_organizer(event_id) or id = public.current_person_id(event_id));
+using (public.is_organizer(event_id))
+with check (public.is_organizer(event_id));
 
 create policy people_delete_organizer
 on public.people for delete
@@ -766,10 +806,12 @@ grant select on public.people, public.access_codes, public.team_members, public.
 grant insert, update, delete on public.teams, public.people, public.access_codes, public.team_members, public.visits to authenticated;
 grant execute on function public.claim_person(text, text) to authenticated;
 grant execute on function public.release_current_person(uuid) to authenticated;
+grant execute on function public.touch_presence(uuid) to authenticated;
 grant execute on function public.advance_event(uuid, public.event_status) to authenticated;
 grant execute on function public.save_signal(uuid, uuid, integer, text, text) to authenticated;
 grant execute on function public.remove_signal(uuid, uuid) to authenticated;
 grant execute on function public.remove_team(uuid) to authenticated;
+grant execute on function public.remove_person(uuid) to authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

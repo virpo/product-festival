@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   },
   description:
     "Try every product, leave useful feedback, and invest fake money without a public leaderboard.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

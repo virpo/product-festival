@@ -17,8 +17,7 @@
     "next": "16.2.11",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "zod": "^4.4.3"
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.0",
@@ -34,5 +33,9 @@
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
-  "description": "QR feedback and fake-money signals for product festivals"
+  "description": "QR feedback and fake-money signals for product festivals",
+  "overrides": {
+    "postcss": "8.5.22",
+    "sharp": "0.35.3"
+  }
 }

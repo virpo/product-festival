@@ -3,7 +3,12 @@
 import { coverageFor } from "@/lib/domain/stats";
 import { remainingWallet } from "@/lib/domain/rules";
 import type { FestivalSnapshot, Person } from "@/lib/domain/types";
-import { ArrowRight, QrCode, WalletCards } from "lucide-react";
+import {
+  ArrowRight,
+  MessageSquareText,
+  QrCode,
+  WalletCards,
+} from "lucide-react";
 import Link from "next/link";
 import { ProgressMeter } from "./ProgressMeter";
 
@@ -16,6 +21,11 @@ export function ParticipantHome({
 }) {
   const coverage = coverageFor(person.id, snapshot);
   const remaining = remainingWallet(person.id, snapshot);
+  const ownTeam = snapshot.teamMembers.some(
+    (membership) => membership.personId === person.id,
+  );
+  const isOpen = snapshot.event.status === "open";
+  const isReleased = snapshot.event.status === "released";
 
   return (
     <main className="participant-home">
@@ -23,16 +33,38 @@ export function ParticipantHome({
         <p className="eyebrow">{snapshot.event.name}</p>
         <h1>Ahoj, {person.name}.</h1>
         <p>
-          Vyskúšaj produkt pri stole. Potom naskenuj jeho QR kód a nechaj tímu
-          peniaze aj konkrétny feedback.
+          {isOpen
+            ? "Vyskúšaj produkt pri stole. Potom naskenuj jeho QR kód a nechaj tímu peniaze aj konkrétny feedback."
+            : isReleased
+              ? "Festival sa skončil. Tímy už majú svoje investície aj menovitý feedback."
+              : "Investovanie je momentálne zatvorené. Tvoje doterajšie odpovede ostávajú uložené."}
         </p>
       </section>
 
-      <Link className="scan-card" href="/scan">
-        <span className="scan-icon"><QrCode aria-hidden="true" /></span>
+      <Link
+        className={`scan-card ${isOpen ? "" : "scan-card--quiet"}`}
+        href={isReleased && ownTeam ? "/results" : isOpen ? "/scan" : "/portfolio"}
+      >
+        <span className="scan-icon">
+          {isReleased && ownTeam ? (
+            <MessageSquareText aria-hidden="true" />
+          ) : isOpen ? (
+            <QrCode aria-hidden="true" />
+          ) : (
+            <WalletCards aria-hidden="true" />
+          )}
+        </span>
         <span>
-          <small>Ďalší tím</small>
-          <strong>Skenovať QR kód</strong>
+          <small>
+            {isReleased && ownTeam ? "Tvoj tím" : isOpen ? "Ďalší tím" : "Tvoj prehľad"}
+          </small>
+          <strong>
+            {isReleased && ownTeam
+              ? "Otvoriť feedback"
+              : isOpen
+                ? "Skenovať QR kód"
+                : "Pozrieť investície"}
+          </strong>
         </span>
         <ArrowRight aria-hidden="true" />
       </Link>

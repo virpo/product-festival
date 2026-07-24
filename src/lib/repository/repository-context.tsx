@@ -96,6 +96,22 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh, repository]);
 
+  const currentPersonId = currentPerson?.id;
+
+  useEffect(() => {
+    if (!repository || !currentPersonId) {
+      return;
+    }
+
+    const touch = () => void repository.touchPresence(currentPersonId);
+    const initialTouch = window.setTimeout(touch, 0);
+    const heartbeat = window.setInterval(touch, 2 * 60 * 1000);
+    return () => {
+      window.clearTimeout(initialTouch);
+      window.clearInterval(heartbeat);
+    };
+  }, [currentPersonId, repository]);
+
   const commands = useMemo<FestivalContextValue["commands"]>(() => {
     async function run(action: () => Promise<unknown>) {
       if (!repository) {

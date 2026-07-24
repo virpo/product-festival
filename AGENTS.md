@@ -1,5 +1,27 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# Product Festival 🎪
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+Standalone Next.js app for QR product testing, fake-money signals and private
+feedback receipts.
+
+## Shape
+
+- `src/lib/domain` — framework-free rules and aggregate stats.
+- `src/lib/repository` — one interface, local demo and Supabase adapters.
+- `src/components/participant` — mobile scanner, signal form and portfolio.
+- `src/components/admin` — utilitarian CRM and QR sheets.
+- `src/components/wall` — aggregate-only projector view.
+- `src/components/results` — collective summary and private receipts.
+- `supabase` — schema, RLS, Realtime, Storage policies and sample seed.
+
+## Invariants
+
+- No public team totals, ranking or winner.
+- One editable signal per person and team.
+- Text or audio feedback is required; amount may be zero.
+- No own-team investment, overspending or writes outside `open`.
+- Results stay private until `released`.
+- Never expose a Supabase service-role key.
+- Demo mode must keep working without environment variables.
+
+Run tests, lint and production build before calling work complete. Verify mobile
+participant screens and the projector wall in a real browser.

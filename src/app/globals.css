@@ -525,6 +525,21 @@ button {
   background: var(--cyan-bright);
 }
 
+.scan-card--quiet {
+  color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.scan-card--quiet:hover {
+  background: #222226;
+}
+
+.scan-card--quiet .scan-icon {
+  border-color: var(--line-strong);
+  background: rgba(255, 255, 255, 0.035);
+}
+
 .scan-card > svg {
   width: 30px;
   height: 30px;
