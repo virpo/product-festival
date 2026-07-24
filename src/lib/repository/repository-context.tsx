@@ -15,7 +15,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { DemoFestivalRepository } from "./demo-repository";
+import { createFestivalRepository } from "./create-repository";
 import type {
   FestivalRepository,
   SavePersonInput,
@@ -54,7 +54,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   const [repository] = useState<FestivalRepository | null>(() =>
     typeof window === "undefined"
       ? null
-      : new DemoFestivalRepository(window.localStorage),
+      : createFestivalRepository(window.localStorage),
   );
   const [snapshot, setSnapshot] = useState<FestivalSnapshot | null>(null);
   const [currentPerson, setCurrentPerson] = useState<Person | null>(null);
