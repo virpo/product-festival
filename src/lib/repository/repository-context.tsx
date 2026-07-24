@@ -51,15 +51,19 @@ type FestivalContextValue = {
 export const FestivalContext = createContext<FestivalContextValue | null>(null);
 
 export function FestivalProvider({ children }: { children: ReactNode }) {
-  const [repository] = useState<FestivalRepository | null>(() =>
-    typeof window === "undefined"
-      ? null
-      : createFestivalRepository(window.localStorage),
-  );
+  const [repository, setRepository] =
+    useState<FestivalRepository | null>(null);
   const [snapshot, setSnapshot] = useState<FestivalSnapshot | null>(null);
   const [currentPerson, setCurrentPerson] = useState<Person | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const initialize = window.setTimeout(() => {
+      setRepository(createFestivalRepository(window.localStorage));
+    }, 0);
+    return () => window.clearTimeout(initialize);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!repository) {

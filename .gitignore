@@ -13,6 +13,9 @@
 
 # testing
 /coverage
+/supabase/.temp/
+/.playwright-cli/
+/output/
 
 # next.js
 /.next/
@@ -41,3 +44,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local Netlify folder
+.netlify
+
+# Local editor settings
+/.vscode/

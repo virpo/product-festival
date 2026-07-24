@@ -23,5 +23,11 @@ feedback receipts.
 - Never expose a Supabase service-role key.
 - Demo mode must keep working without environment variables.
 
+## Operations
+
+- Supabase project login: `hello@aibuildweek.com`.
+- Netlify project: `ai-build-week-product-festival` in the `Pumpkings` team.
+- Production domain: `https://festival.aibuildweek.com`.
+
 Run tests, lint and production build before calling work complete. Verify mobile
 participant screens and the projector wall in a real browser.

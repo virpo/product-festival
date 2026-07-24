@@ -828,8 +828,14 @@ on storage.objects for insert
 to authenticated
 with check (
   bucket_id = 'festival-feedback'
-  and split_part(name, '/', 2)::uuid = public.current_person_id(
-    split_part(name, '/', 1)::uuid
+  and split_part(storage.objects.name, '/', 2)::uuid = public.current_person_id(
+    split_part(storage.objects.name, '/', 1)::uuid
+  )
+  and exists (
+    select 1
+    from public.events e
+    where e.id = split_part(storage.objects.name, '/', 1)::uuid
+      and e.status = 'open'
   )
 );
 
@@ -855,8 +861,21 @@ on storage.objects for delete
 to authenticated
 using (
   bucket_id = 'festival-feedback'
-  and split_part(name, '/', 2)::uuid = public.current_person_id(
-    split_part(name, '/', 1)::uuid
+  and split_part(storage.objects.name, '/', 2)::uuid = public.current_person_id(
+    split_part(storage.objects.name, '/', 1)::uuid
+  )
+  and (
+    exists (
+      select 1
+      from public.events e
+      where e.id = split_part(storage.objects.name, '/', 1)::uuid
+        and e.status = 'open'
+    )
+    or not exists (
+      select 1
+      from public.signals s
+      where s.audio_path = storage.objects.name
+    )
   )
 );
 

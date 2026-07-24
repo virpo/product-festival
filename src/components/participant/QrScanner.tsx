@@ -5,9 +5,28 @@ import { ArrowRight, Camera, Keyboard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+type Scanner = {
+  stop(): Promise<void>;
+  clear(): void;
+};
+
+async function stopAndClear(scanner: Scanner) {
+  try {
+    await scanner.stop();
+  } catch {
+    // stop() throws synchronously when camera startup never completed.
+  }
+
+  try {
+    scanner.clear();
+  } catch {
+    // A scanner still changing state will clean itself up after startup.
+  }
+}
+
 export function QrScanner() {
   const router = useRouter();
-  const scannerRef = useRef<{ stop(): Promise<void>; clear(): void } | null>(null);
+  const scannerRef = useRef<Scanner | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [state, setState] = useState<"starting" | "ready" | "error">("starting");
   const [error, setError] = useState("");
@@ -47,8 +66,7 @@ export function QrScanner() {
       active = false;
       const scanner = scannerRef.current;
       if (scanner) {
-        void scanner.stop().catch(() => undefined);
-        scanner.clear();
+        void stopAndClear(scanner);
       }
     };
   }, [router]);

@@ -3,7 +3,7 @@ project_id = "product-festival"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -17,10 +17,27 @@ port = 54323
 
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+site_url = "https://festival.aibuildweek.com"
+additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 enable_signup = true
 enable_anonymous_sign_ins = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = false
+max_frequency = "1m0s"
+otp_length = 8
+otp_expiry = 3600
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
 
 [storage]
 enabled = true
 file_size_limit = "15MiB"
+
+[storage.vector]
+enabled = false

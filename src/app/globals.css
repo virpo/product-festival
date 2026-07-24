@@ -332,6 +332,7 @@ button {
 .primary-button {
   width: 100%;
   margin-top: 14px;
+  padding-inline: 18px;
   border: 0;
   color: #071d1c;
   background: var(--cyan);

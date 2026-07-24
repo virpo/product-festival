@@ -1,11 +1,48 @@
 # Product Festival 🎪
 
-A small, reusable web app for product-demo events.
+Turn demo day into a room full of people actually trying each other’s products.
 
-People scan a QR code at each table, try the product, give the team a fake-money
-signal and leave written or recorded feedback. The room sees shared progress in
-real time. Teams receive their named feedback only after the organizer releases
-it. There is no public leaderboard.
+Each team puts a QR code on its table. People scan it, try the product, invest
+some of their fake budget and leave concrete written or recorded feedback. The
+projector shows the room moving. At the end, every team gets its own feedback.
+
+It grew out of **AI Build Day**, where participants backed projects they liked
+with fake money and QR codes. We adapted the idea for the five-day
+**AI Build Week**: instead of spending Friday morning polishing presentations,
+teams have to make their product usable by someone else and learn from what
+happens.
+
+[Open the AI Build Week festival](https://festival.aibuildweek.com)
+
+## When it is useful
+
+- **A one-day hackathon, like AI Build Day:** turn a row of pitches into quick
+  demos, real product trials and a playful signal from the room.
+- **A longer program, like AI Build Week:** make “someone else can use it” the
+  finish line and send every team home with useful feedback.
+- **Accelerators and internal demo days:** let the whole room participate
+  instead of separating judges from an audience.
+
+There does not have to be a winner. Here, an investment means: “I want to see
+where this goes.”
+
+## What it looks like
+
+The public wall shows shared progress and time, never a team leaderboard.
+
+![Public projector wall showing the live Product Festival](docs/images/public-wall.png)
+
+Participants enter on their phones, then scan the QR code at a team’s table.
+
+<p align="center">
+  <img src="docs/images/participant-entry.png" width="360" alt="Participant entry screen on a phone">
+  &nbsp;&nbsp;&nbsp;
+  <img src="docs/images/participant-investment.png" width="360" alt="Investment and feedback screen on a phone">
+</p>
+
+The organizer controls the event and watches participation in real time.
+
+![Product Festival organizer dashboard](docs/images/organizer-dashboard.png)
 
 ## What is included
 
