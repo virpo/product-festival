@@ -172,6 +172,148 @@ describe("FestivalProvider retry recovery", () => {
     expect(screen.getByText("ready")).toBeInTheDocument();
   });
 
+  it("schedules recovery when the follow-up fetch fails", async () => {
+    const snapshot = createDemoSnapshot();
+    let releaseFirst: () => void = () => undefined;
+    const getSnapshot = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve(snapshot);
+          }),
+      )
+      // The follow-up forced by the invalidation fails.
+      .mockRejectedValueOnce(new Error("Follow-up unavailable"))
+      .mockResolvedValue(snapshot);
+
+    let invalidate: () => void = () => undefined;
+    const subscribe = vi.fn(
+      (
+        listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        invalidate = listener;
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi.fn().mockResolvedValue(null),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence: vi.fn(),
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam: vi.fn(),
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <Probe />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    await act(async () => {
+      invalidate();
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    await act(async () => {
+      releaseFirst();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // A stale snapshot must never be advertised as live just because the first
+    // request succeeded.
+    expect(screen.getByText("retrying")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_500);
+    });
+
+    expect(screen.getByText("live")).toBeInTheDocument();
+  });
+
+  it("does not refetch the snapshot for a successful presence heartbeat", async () => {
+    const snapshot = createDemoSnapshot();
+    const getSnapshot = vi.fn().mockResolvedValue(snapshot);
+    const touchPresence = vi.fn().mockResolvedValue(undefined);
+
+    const subscribe = vi.fn(
+      (
+        _listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi
+        .fn()
+        .mockResolvedValue({ id: "person-1", name: "Peter" }),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence,
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam: vi.fn(),
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <Probe />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const afterInitialLoad = getSnapshot.mock.calls.length;
+
+    // Two heartbeats, staying under the 60s safety poll.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2 * 60 * 1_000);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2 * 60 * 1_000);
+    });
+
+    expect(touchPresence.mock.calls.length).toBeGreaterThanOrEqual(2);
+    // Heartbeats must not each cost a full snapshot; only safety polls may add.
+    expect(getSnapshot.mock.calls.length - afterInitialLoad).toBeLessThanOrEqual(
+      5,
+    );
+  });
+
   it("coalesces presence churn into one refetch per interval", async () => {
     const snapshot = createDemoSnapshot();
     const getSnapshot = vi.fn().mockResolvedValue(snapshot);

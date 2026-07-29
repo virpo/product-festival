@@ -85,7 +85,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   });
   const refreshInFlight = useRef<Promise<void> | null>(null);
   const refreshQueued = useRef<Promise<void> | null>(null);
-  const refreshRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const recoverRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const snapshotDirty = useRef(false);
   const lastInvalidationRefresh = useRef(0);
   const retryTimer = useRef<number | null>(null);
@@ -141,9 +141,12 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         // exactly one follow-up fetch.
         if (snapshotDirty.current && !refreshQueued.current) {
           snapshotDirty.current = false;
+          // Route the follow-up through recovery. A bare refresh would swallow
+          // its failure, so this request could mark the connection live while
+          // the read that actually mattered never landed.
           refreshQueued.current = Promise.resolve().then(() => {
             refreshQueued.current = null;
-            return refreshRef.current().catch(() => undefined);
+            return recoverRef.current().catch(() => undefined);
           });
         }
       });
@@ -151,10 +154,6 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     refreshInFlight.current = request;
     return request;
   }, [repository]);
-
-  useEffect(() => {
-    refreshRef.current = refresh;
-  }, [refresh]);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimer.current !== null) {
@@ -219,7 +218,17 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     await refreshWithRecovery();
   }, [clearRetryTimer, refreshWithRecovery]);
 
+  // A write must observe its own effect. Marking the snapshot dirty first means
+  // that if a poll or invalidation refresh is already running — and may have read
+  // the database before this write committed — the existing follow-up machinery
+  // guarantees one more fetch afterwards instead of joining a pre-write request.
+  const refreshAfterWrite = useCallback(async () => {
+    snapshotDirty.current = true;
+    await refreshWithRecovery();
+  }, [refreshWithRecovery]);
+
   useEffect(() => {
+    recoverRef.current = refreshWithRecovery;
     retryAction.current = () => {
       void refreshWithRecovery().catch(() => undefined);
     };
@@ -335,11 +344,14 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Presence is a best-effort heartbeat, so it must not refresh on success:
+    // routing it through `runCommand` cost a full snapshot (~10 requests) per
+    // beat on every phone, which is most of the load this provider is trying to
+    // shed. Only a failed beat is worth feeding into connection recovery.
     const touch = () => {
-      void runCommand(
-        () => repository.touchPresence(currentPersonId),
-        refreshWithRecovery,
-      ).catch(() => undefined);
+      void repository.touchPresence(currentPersonId).catch(() => {
+        void refreshWithRecovery().catch(() => undefined);
+      });
     };
     const initialTouch = window.setTimeout(touch, 0);
     const heartbeat = window.setInterval(touch, 2 * 60 * 1000);
@@ -355,7 +367,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         throw new Error("Festival sa ešte načítava.");
       }
 
-      await runCommand(action, refreshWithRecovery);
+      await runCommand(action, refreshAfterWrite);
     }
 
     return {
@@ -400,7 +412,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         await run(() => repository!.resetDemo());
       },
     };
-  }, [refreshWithRecovery, repository, retryNow]);
+  }, [refreshAfterWrite, repository, retryNow]);
 
   const value = useMemo<FestivalContextValue>(
     () => ({
