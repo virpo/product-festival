@@ -84,9 +84,13 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     stale: false,
   });
   const refreshInFlight = useRef<Promise<void> | null>(null);
-  const refreshQueued = useRef<Promise<void> | null>(null);
   const recoverRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const drainRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const snapshotDirty = useRef(false);
+  const draining = useRef(false);
+  // Counts started fetches, so a writer can tell whether the request it is
+  // looking at began before or after its own write.
+  const fetchStarts = useRef(0);
   const lastInvalidationRefresh = useRef(0);
   const retryTimer = useRef<number | null>(null);
   const retryAttempt = useRef(0);
@@ -111,7 +115,9 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       return refreshInFlight.current;
     }
 
+    // This fetch observes everything committed up to now.
     snapshotDirty.current = false;
+    fetchStarts.current += 1;
 
     const request = (async () => {
       const [nextSnapshot, nextPerson] = await Promise.all([
@@ -135,28 +141,13 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         if (refreshInFlight.current === request) {
           refreshInFlight.current = null;
         }
-        // An invalidation landed while these queries were running, so they may
-        // have read the database before that change committed. Coalescing it
-        // into this request would leave the snapshot permanently behind, so run
-        // exactly one follow-up fetch.
-        if (snapshotDirty.current && !refreshQueued.current) {
-          snapshotDirty.current = false;
-          // Route the follow-up through recovery: a bare refresh would swallow
-          // its failure, so this request could mark the connection live while
-          // the read that actually mattered never landed.
-          //
-          // Stay non-null until the follow-up finishes, so a writer awaiting
-          // read-your-write can observe it. `refreshInFlight` was cleared above,
-          // so this starts a genuinely new fetch.
-          refreshQueued.current = (async () => {
-            try {
-              await recoverRef.current();
-            } catch {
-              // Recovery owns the retry; awaiters must not see a rejection.
-            } finally {
-              refreshQueued.current = null;
-            }
-          })();
+        // Something landed while these queries were running, so they may have
+        // read the database before it committed. Draining is serialized rather
+        // than a single queued promise: a lone sentinel suppressed its own
+        // successor, which stranded the dirty flag and let a writer resolve on
+        // a pre-write snapshot.
+        if (snapshotDirty.current) {
+          void drainRef.current();
         }
       });
 
@@ -232,25 +223,49 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   // the database before this write committed — the existing follow-up machinery
   // guarantees one more fetch afterwards instead of joining a pre-write request.
   const refreshAfterWrite = useCallback(async () => {
-    snapshotDirty.current = true;
-    await refreshWithRecovery();
-
-    // Joining a request that started before the write only guarantees that a
-    // follow-up gets scheduled, not that it finished. Await it too, so a caller
-    // that closes a form or reports success on resolve is really looking at
-    // post-write state.
-    const queued = refreshQueued.current;
-    if (queued) {
-      await queued;
+    // Wait out any request that began before this write: its snapshot cannot
+    // contain the write, so joining it would let the caller report success on
+    // pre-write state. A new fetch bumps `fetchStarts`, which is the signal that
+    // the request now in flight is safe to join.
+    const startedBefore = fetchStarts.current;
+    for (;;) {
+      const pending = refreshInFlight.current;
+      if (!pending || fetchStarts.current !== startedBefore) {
+        break;
+      }
+      await pending.catch(() => undefined);
     }
+
+    await refreshWithRecovery();
   }, [refreshWithRecovery]);
+
+  // Keep fetching while changes keep arriving mid-fetch, one at a time.
+  const drainDirty = useCallback(async () => {
+    if (draining.current) {
+      return;
+    }
+    draining.current = true;
+    try {
+      while (snapshotDirty.current) {
+        snapshotDirty.current = false;
+        try {
+          await recoverRef.current();
+        } catch {
+          // Recovery owns the connection state and the backoff.
+        }
+      }
+    } finally {
+      draining.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     recoverRef.current = refreshWithRecovery;
+    drainRef.current = drainDirty;
     retryAction.current = () => {
       void refreshWithRecovery().catch(() => undefined);
     };
-  }, [refreshWithRecovery]);
+  }, [drainDirty, refreshWithRecovery]);
 
   useEffect(() => {
     if (!repository) {

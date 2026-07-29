@@ -1,5 +1,12 @@
 import { act, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
+
+function capturedWrite(
+  commands: ReturnType<typeof useFestival>["commands"] | null,
+): Promise<void> {
+  if (!commands) throw new Error("commands not captured");
+  return commands.saveTeam({ name: "Tim" } as never);
+}
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemoSnapshot } from "./demo-data";
 import type { FestivalRepository } from "./FestivalRepository";
@@ -423,6 +430,127 @@ describe("FestivalProvider retry recovery", () => {
 
     await act(async () => {
       releaseSecond();
+      await write;
+    });
+
+    expect(settled).toBe(true);
+  });
+
+  it("keeps a write pending when it lands during a queued follow-up", async () => {
+    const snapshot = createDemoSnapshot();
+    const releases: Array<() => void> = [];
+    const deferred = () =>
+      new Promise((resolve) => {
+        releases.push(() => resolve(snapshot));
+      });
+
+    // 1: initial refresh, 2: queued follow-up from the invalidation,
+    // 3: the fetch the write must wait for.
+    const getSnapshot = vi
+      .fn()
+      .mockImplementationOnce(deferred)
+      .mockImplementationOnce(deferred)
+      .mockImplementationOnce(deferred)
+      .mockResolvedValue(snapshot);
+
+    let invalidate: () => void = () => undefined;
+    const subscribe = vi.fn(
+      (
+        listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        invalidate = listener;
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    const saveTeam = vi.fn().mockResolvedValue(undefined);
+
+    type Commands = ReturnType<typeof useFestival>["commands"];
+
+    function CommandProbe({ onReady }: { onReady: (value: Commands) => void }) {
+      const { commands } = useFestival();
+
+      useEffect(() => {
+        onReady(commands);
+      }, [commands, onReady]);
+
+      return null;
+    }
+
+    let captured: Commands | null = null;
+    const handleReady = (value: Commands) => {
+      captured = value;
+    };
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi.fn().mockResolvedValue(null),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence: vi.fn(),
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam,
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <CommandProbe onReady={handleReady} />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+
+    // Invalidate during the initial refresh, then let it finish so the drain
+    // starts the queued follow-up.
+    await act(async () => {
+      invalidate();
+      await vi.advanceTimersByTimeAsync(50);
+      releases[0]();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+
+    // The write lands while that queued follow-up is still unresolved.
+    let settled = false;
+    const write = capturedWrite(captured).then(() => {
+      settled = true;
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(saveTeam).toHaveBeenCalledTimes(1);
+
+    // Releasing only the queued follow-up must not settle the write: that fetch
+    // began before it.
+    await act(async () => {
+      releases[1]();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(settled).toBe(false);
+    expect(getSnapshot).toHaveBeenCalledTimes(3);
+
+    await act(async () => {
+      releases[2]();
       await write;
     });
 
