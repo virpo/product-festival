@@ -8,37 +8,83 @@ import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowLeft, Home } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// `record_visit` is an idempotent upsert, so retrying a failed write is safe.
+// Bound the attempts so a persistently failing RPC cannot spin.
+const VISIT_MAX_ATTEMPTS = 3;
 
 export default function TeamPage() {
   const params = useParams<{ code: string }>();
   const { commands, currentPerson, error, mode, snapshot } = useFestival();
-  const visitMarked = useRef(false);
+  // Keyed by person and team: this route component can be preserved across
+  // `[code]` changes, and a plain boolean would then suppress the next team's
+  // visit for the rest of the session.
+  const visitState = useRef<{
+    key: string | null;
+    attempts: number;
+    done: boolean;
+    inFlight: boolean;
+  }>({ key: null, attempts: 0, done: false, inFlight: false });
+  const [visitRetry, setVisitRetry] = useState(0);
   const code = decodeURIComponent(params.code ?? "").toUpperCase();
   const team = snapshot?.teams.find(
     (item) => !item.archived && item.code.toUpperCase() === code,
   );
+
+  const visitKey =
+    currentPerson && team ? `${currentPerson.id}:${team.id}` : null;
 
   useEffect(() => {
     if (
       !team ||
       !currentPerson ||
       !snapshot ||
+      !visitKey ||
       snapshot.event.status !== "open" ||
-      isOwnTeam(currentPerson.id, team.id, snapshot) ||
-      visitMarked.current
+      isOwnTeam(currentPerson.id, team.id, snapshot)
     ) {
       return;
     }
-    visitMarked.current = true;
-    // `record_visit` is an idempotent upsert, so a failed attempt must not stay
-    // marked as done — otherwise a scan during a brief outage silently loses the
-    // visit for the lifetime of this page. Releasing the guard lets the next
-    // snapshot refresh retry it.
-    void commands.markVisit(team.id).catch(() => {
-      visitMarked.current = false;
-    });
-  }, [commands, currentPerson, snapshot, team]);
+
+    if (visitState.current.key !== visitKey) {
+      visitState.current = {
+        key: visitKey,
+        attempts: 0,
+        done: false,
+        inFlight: false,
+      };
+    }
+
+    const state = visitState.current;
+    // `inFlight` matters because this effect also reruns on every snapshot
+    // change, which would otherwise fire concurrent duplicate writes.
+    if (state.done || state.inFlight || state.attempts >= VISIT_MAX_ATTEMPTS) {
+      return;
+    }
+
+    state.inFlight = true;
+    state.attempts += 1;
+
+    void commands
+      .markVisit(team.id)
+      .then(() => {
+        if (visitState.current.key === visitKey) {
+          visitState.current.done = true;
+          visitState.current.inFlight = false;
+        }
+      })
+      .catch(() => {
+        if (visitState.current.key === visitKey) {
+          visitState.current.inFlight = false;
+        }
+        // `runCommand` awaits its recovery refresh before rejecting, so that
+        // snapshot render already happened with the guard still held. Bump state
+        // to rerun this effect instead of waiting for an unrelated invalidation
+        // or the 60s safety poll.
+        setVisitRetry((value) => value + 1);
+      });
+  }, [commands, currentPerson, snapshot, team, visitKey, visitRetry]);
 
   if (!snapshot) {
     return (
