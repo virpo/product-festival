@@ -39,6 +39,61 @@ export function isOwnTeam(
   );
 }
 
+export function validateVisit(
+  personId: string,
+  teamId: string,
+  snapshot: FestivalSnapshot,
+) {
+  if (snapshot.event.status !== "open") {
+    throw new FestivalRuleError("Návštevy sa už nezapisujú.");
+  }
+
+  const person = snapshot.people.find((candidate) => candidate.id === personId);
+  const team = snapshot.teams.find(
+    (candidate) => candidate.id === teamId && !candidate.archived,
+  );
+
+  if (!person || !team) {
+    throw new FestivalRuleError("Tím alebo človek už nie je dostupný.");
+  }
+
+  if (isOwnTeam(personId, teamId, snapshot)) {
+    throw new FestivalRuleError("Vlastný tím sa do návštev nepočíta.");
+  }
+
+  return team;
+}
+
+export function validateTeamAssignment(
+  personId: string,
+  teamId: string | null | undefined,
+  snapshot: FestivalSnapshot,
+): void {
+  if (teamId === undefined) {
+    return;
+  }
+
+  if (
+    teamId &&
+    !snapshot.teams.some((team) => team.id === teamId && !team.archived)
+  ) {
+    throw new FestivalRuleError("Tím už nie je dostupný.");
+  }
+
+  const currentTeamId =
+    snapshot.teamMembers.find((member) => member.personId === personId)
+      ?.teamId ?? null;
+
+  if (
+    currentTeamId !== teamId &&
+    snapshot.signals.some((signal) => signal.investorId === personId)
+  ) {
+    throw new FestivalRuleError(
+      "Tím už nemožno zmeniť po odoslaní feedbacku.",
+    );
+  }
+}
+
 export function validateSignal(
   input: SignalInput,
   snapshot: FestivalSnapshot,

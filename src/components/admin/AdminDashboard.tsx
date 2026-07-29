@@ -4,6 +4,7 @@ import type {
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
+  Person,
 } from "@/lib/domain/types";
 import type {
   SavePersonInput,
@@ -19,7 +20,6 @@ import { TeamsTable } from "./TeamsTable";
 export type FestivalContextValueForTests = {
   commands: {
     advanceEvent(status: EventStatus): Promise<void>;
-    assignPersonToTeam(personId: string, teamId: string | null): Promise<void>;
     removePerson(personId: string): Promise<void>;
     removeTeam(teamId: string): Promise<void>;
     resetDemo(): Promise<void>;
@@ -41,10 +41,12 @@ const tabs: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
 
 export function AdminDashboard({
   snapshot,
+  currentPerson,
   commands,
   isDemo = true,
 }: {
   snapshot: FestivalSnapshot;
+  currentPerson: Person;
   commands: AdminCommands;
   isDemo?: boolean;
 }) {
@@ -87,7 +89,11 @@ export function AdminDashboard({
           <TeamsTable commands={commands} snapshot={snapshot} />
         ) : null}
         {tab === "people" ? (
-          <PeopleTable commands={commands} snapshot={snapshot} />
+          <PeopleTable
+            commands={commands}
+            currentPerson={currentPerson}
+            snapshot={snapshot}
+          />
         ) : null}
         {tab === "settings" ? (
           <EventSettings commands={commands} event={snapshot.event} isDemo={isDemo} />

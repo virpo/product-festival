@@ -1,13 +1,21 @@
 "use client";
 
 import { PublicWall } from "@/components/wall/PublicWall";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 
 export default function WallPage() {
-  const { loading, snapshot } = useFestival();
+  const { commands, error, snapshot } = useFestival();
 
-  if (loading || !snapshot) {
-    return <main className="wall-loading"><span /><p>Pripájam živé dáta…</p></main>;
+  if (!snapshot) {
+    return (
+      <InitialLoadState
+        error={error}
+        label="Pripájam živé dáta…"
+        onRetry={commands.refresh}
+        variant="wall"
+      />
+    );
   }
 
   return <PublicWall event={snapshot.event} stats={snapshot.stats} />;

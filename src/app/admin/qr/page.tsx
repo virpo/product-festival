@@ -2,20 +2,25 @@
 
 import { QrSheet } from "@/components/admin/QrSheet";
 import { AppShell } from "@/components/brand/AppShell";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminQrPage() {
-  const { currentPerson, loading, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, snapshot } = useFestival();
   const origin =
     process.env.NEXT_PUBLIC_APP_ORIGIN ||
     (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state"><span /><p>Generujem QR kódy…</p></main>
+        <InitialLoadState
+          error={error}
+          label="Generujem QR kódy…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }

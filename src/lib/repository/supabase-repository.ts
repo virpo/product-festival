@@ -11,18 +11,29 @@ import type {
   TeamMember,
   Visit,
 } from "@/lib/domain/types";
+import {
+  ACCESS_CODE_MAX_LENGTH,
+  normalizeAccessCode,
+} from "@/lib/domain/access-code";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import type {
   FestivalRepository,
+  ClaimPersonOptions,
+  RepositoryConnectionStatus,
   SavePersonInput,
   SaveTeamInput,
 } from "./FestivalRepository";
+import { AccessCodeInUseError } from "./FestivalRepository";
+
+export { AccessCodeInUseError } from "./FestivalRepository";
 
 type RepositoryOptions = {
   eventSlug: string;
 };
 
 type Row = Record<string, unknown>;
+
+export const AUDIO_URL_TTL_SECONDS = 6 * 60 * 60;
 
 function fail(error: { message: string } | null, fallback: string) {
   if (error) {
@@ -198,7 +209,7 @@ export class SupabaseFestivalRepository implements FestivalRepository {
         if (!signal.audioPath) return signal;
         const { data, error } = await this.client.storage
           .from("festival-feedback")
-          .createSignedUrl(signal.audioPath, 60 * 60);
+          .createSignedUrl(signal.audioPath, AUDIO_URL_TTL_SECONDS);
         return {
           ...signal,
           audioUrl: error ? null : data.signedUrl,
@@ -287,7 +298,10 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     return data ? mapPerson(data) : null;
   }
 
-  subscribe(listener: () => void): () => void {
+  subscribe(
+    listener: () => void,
+    connectionListener?: (status: RepositoryConnectionStatus) => void,
+  ): () => void {
     const channel: RealtimeChannel = this.client
       .channel(`festival-${this.options.eventSlug}`)
       .on(
@@ -305,23 +319,55 @@ export class SupabaseFestivalRepository implements FestivalRepository {
         { event: "*", schema: "public", table: "event_stats" },
         listener,
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "teams" },
+        listener,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "people" },
+        listener,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "team_members" },
+        listener,
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          connectionListener?.("connected");
+        } else if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          connectionListener?.("disconnected");
+        }
+      });
 
     return () => {
       void channel.unsubscribe();
     };
   }
 
-  async claimPerson(accessCode: string): Promise<Person> {
+  async claimPerson(
+    accessCode: string,
+    options: ClaimPersonOptions = {},
+  ): Promise<Person> {
     const session = await this.client.auth.getSession();
     if (!session.data.session) {
       const { error } = await this.client.auth.signInAnonymously();
       fail(error, "Anonymné prihlásenie zlyhalo.");
     }
     const { data, error } = await this.client.rpc("claim_person", {
+      allow_takeover: options.takeover ?? false,
       claim_code: accessCode.trim().toUpperCase(),
       claim_event_slug: this.options.eventSlug,
     });
+    if (error?.message.includes("access_code_in_use")) {
+      throw new AccessCodeInUseError();
+    }
     fail(error, "Neznámy prístupový kód.");
     const row = Array.isArray(data) ? data[0] : data;
     return mapPerson(row, accessCode.trim().toUpperCase());
@@ -347,18 +393,12 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     fail(error, "Prítomnosť sa nepodarilo uložiť.");
   }
 
-  async markVisit(personId: string, teamId: string): Promise<void> {
+  async markVisit(teamId: string): Promise<void> {
     const event = await this.getEvent();
-    const now = new Date().toISOString();
-    const { error } = await this.client.from("visits").upsert(
-      {
-        event_id: event.id,
-        person_id: personId,
-        team_id: teamId,
-        last_visited_at: now,
-      },
-      { onConflict: "event_id,person_id,team_id" },
-    );
+    const { error } = await this.client.rpc("record_visit", {
+      target_event_id: event.id,
+      target_team_id: teamId,
+    });
     fail(error, "Návštevu sa nepodarilo uložiť.");
   }
 
@@ -463,29 +503,27 @@ export class SupabaseFestivalRepository implements FestivalRepository {
 
   async savePerson(input: SavePersonInput): Promise<Person> {
     const event = await this.getEvent();
-    const code = (input.accessCode || generateCode(input.name))
-      .trim()
-      .toUpperCase();
-    const payload = {
-      event_id: event.id,
-      name: input.name.trim(),
-      role: input.role,
-      wallet_budget: input.walletBudget,
-    };
-    const query = input.id
-      ? this.client.from("people").update(payload).eq("id", input.id)
-      : this.client.from("people").insert(payload);
-    const { data, error } = await query.select("*").single();
-    fail(error, "Človeka sa nepodarilo uložiť.");
-    const person = mapPerson(data, code);
-    const { error: codeError } = await this.client.from("access_codes").upsert({
-      person_id: person.id,
-      event_id: event.id,
-      code,
+    const code = normalizeAccessCode(
+      input.accessCode || generateCode(input.name),
+    );
+
+    if (code.length > ACCESS_CODE_MAX_LENGTH) {
+      throw new Error(
+        `Prístupový kód môže mať najviac ${ACCESS_CODE_MAX_LENGTH} znakov.`,
+      );
+    }
+
+    const { data, error } = await this.client.rpc("save_person", {
+      target_access_code: code,
+      target_event_id: event.id,
+      target_name: input.name.trim(),
+      target_person_id: input.id ?? null,
+      target_role: input.role,
+      target_team_id: input.teamId ?? null,
+      target_wallet_budget: input.walletBudget,
     });
-    fail(codeError, "Prístupový kód sa nepodarilo uložiť.");
-    await this.assignPersonToTeam(person.id, input.teamId ?? null);
-    return person;
+    fail(error, "Človeka sa nepodarilo uložiť.");
+    return mapPerson(data, code);
   }
 
   async removePerson(personId: string): Promise<void> {
@@ -495,41 +533,19 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     fail(error, "Človeka sa nepodarilo odstrániť.");
   }
 
-  async assignPersonToTeam(
-    personId: string,
-    teamId: string | null,
-  ): Promise<void> {
-    const event = await this.getEvent();
-    const { error: deleteError } = await this.client
-      .from("team_members")
-      .delete()
-      .eq("event_id", event.id)
-      .eq("person_id", personId);
-    fail(deleteError, "Priradenie sa nepodarilo zmeniť.");
-    if (!teamId) return;
-    const { error } = await this.client.from("team_members").insert({
-      event_id: event.id,
-      person_id: personId,
-      team_id: teamId,
-    });
-    fail(error, "Priradenie sa nepodarilo uložiť.");
-  }
-
   async updateEvent(patch: Partial<FestivalEvent>): Promise<FestivalEvent> {
     const event = await this.getEvent();
-    const payload: Row = {};
-    if (patch.name !== undefined) payload.name = patch.name;
-    if (patch.currency !== undefined) payload.currency = patch.currency;
-    if (patch.walletDefault !== undefined) payload.wallet_default = patch.walletDefault;
-    if (patch.maxPerTeam !== undefined) payload.max_per_team = patch.maxPerTeam;
-    if (patch.coverageTarget !== undefined) payload.coverage_target = patch.coverageTarget;
-    if (patch.locksAt !== undefined) payload.locks_at = patch.locksAt;
-    const { data, error } = await this.client
-      .from("events")
-      .update(payload)
-      .eq("id", event.id)
-      .select("*")
-      .single();
+    const { data, error } = await this.client.rpc("update_event_settings", {
+      target_coverage_target:
+        patch.coverageTarget ?? event.coverageTarget,
+      target_currency: patch.currency ?? event.currency,
+      target_event_id: event.id,
+      target_locks_at:
+        patch.locksAt === undefined ? event.locksAt : patch.locksAt,
+      target_max_per_team: patch.maxPerTeam ?? event.maxPerTeam,
+      target_name: patch.name ?? event.name,
+      target_wallet_default: patch.walletDefault ?? event.walletDefault,
+    });
     fail(error, "Nastavenia sa nepodarilo uložiť.");
     return mapEvent(data);
   }

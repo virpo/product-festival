@@ -1,6 +1,10 @@
 "use client";
 
 import type { FestivalEvent } from "@/lib/domain/types";
+import {
+  fromLocalDateTimeInput,
+  toLocalDateTimeInput,
+} from "@/lib/time/local-date-time";
 import { useState, type FormEvent } from "react";
 
 type SettingsCommands = {
@@ -23,7 +27,7 @@ export function EventSettings({
     walletDefault: event.walletDefault,
     maxPerTeam: event.maxPerTeam,
     coverageTarget: event.coverageTarget,
-    locksAt: event.locksAt ? event.locksAt.slice(0, 16) : "",
+    locksAt: toLocalDateTimeInput(event.locksAt),
   });
   const [saved, setSaved] = useState(false);
 
@@ -31,7 +35,7 @@ export function EventSettings({
     event_.preventDefault();
     await commands.updateEvent({
       ...form,
-      locksAt: form.locksAt ? new Date(form.locksAt).toISOString() : null,
+      locksAt: fromLocalDateTimeInput(form.locksAt),
     });
     setSaved(true);
   }

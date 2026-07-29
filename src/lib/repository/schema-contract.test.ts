@@ -12,6 +12,10 @@ const bootstrapMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607240002_bootstrap_ai_build_week.sql",
 );
+const reliabilityMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607290001_festival_reliability.sql",
+);
 
 describe("Supabase schema contract", () => {
   it("defines protected tables and aggregate realtime state", () => {
@@ -71,5 +75,49 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("'$'");
     expect(sql).not.toContain("insert into public.teams");
     expect(sql).not.toContain("insert into public.people");
+  });
+
+  it("supports deliberate access-code takeover without shared sessions", () => {
+    const sql = readFileSync(reliabilityMigrationPath, "utf8").toLowerCase();
+
+    expect(sql).toContain("allow_takeover boolean");
+    expect(sql).toContain("access_code_in_use");
+    expect(sql).toContain("claimed_person.auth_user_id <> auth.uid()");
+    expect(sql).toContain("set auth_user_id = auth.uid()");
+  });
+
+  it("keeps organizer and visit writes atomic", () => {
+    const sql = readFileSync(reliabilityMigrationPath, "utf8").toLowerCase();
+
+    expect(sql).toContain("create function public.save_person");
+    expect(sql).toContain("membership_locked_after_signal");
+    expect(sql).toContain("char_length(normalized_code) > 24");
+    expect(sql).toContain("create function public.update_event_settings");
+    expect(sql).toContain("revoke update on public.events from authenticated");
+    expect(sql).toContain("create function public.record_visit");
+    expect(sql).toContain("event_row.status <> 'open'");
+    expect(sql).toContain("team_row.archived");
+    expect(sql).toContain("cannot_visit_own_team");
+    expect(sql).toContain("current_organizer_cannot_be_removed");
+    expect(sql).toContain("last_organizer_cannot_be_removed");
+    expect(sql).toContain(
+      "revoke insert, update, delete on public.people, public.access_codes, public.team_members, public.visits from authenticated",
+    );
+  });
+
+  it("publishes shared room state without exposing private activity", () => {
+    const sql = readFileSync(reliabilityMigrationPath, "utf8").toLowerCase();
+
+    for (const table of ["teams", "people", "team_members"]) {
+      expect(sql).toContain(
+        `alter publication supabase_realtime add table public.${table}`,
+      );
+    }
+
+    for (const table of ["access_codes", "visits", "signals"]) {
+      expect(sql).not.toContain(
+        `alter publication supabase_realtime add table public.${table}`,
+      );
+    }
   });
 });

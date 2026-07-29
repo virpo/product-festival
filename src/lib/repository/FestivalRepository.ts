@@ -10,6 +10,18 @@ import type {
 } from "@/lib/domain/types";
 
 export type RepositoryMode = "demo" | "supabase";
+export type RepositoryConnectionStatus = "connected" | "disconnected";
+
+export type ClaimPersonOptions = {
+  takeover?: boolean;
+};
+
+export class AccessCodeInUseError extends Error {
+  constructor() {
+    super("Tento kód sa už používa.");
+    this.name = "AccessCodeInUseError";
+  }
+}
 
 export type StorageLike = {
   getItem(key: string): string | null;
@@ -41,18 +53,23 @@ export type FestivalRepository = {
   readonly mode: RepositoryMode;
   getSnapshot(): Promise<FestivalSnapshot>;
   getCurrentPerson(): Promise<Person | null>;
-  subscribe(listener: () => void): () => void;
-  claimPerson(accessCode: string): Promise<Person>;
+  subscribe(
+    listener: () => void,
+    connectionListener?: (status: RepositoryConnectionStatus) => void,
+  ): () => void;
+  claimPerson(
+    accessCode: string,
+    options?: ClaimPersonOptions,
+  ): Promise<Person>;
   signOut(): Promise<void>;
   touchPresence(personId: string): Promise<void>;
-  markVisit(personId: string, teamId: string): Promise<void>;
+  markVisit(teamId: string): Promise<void>;
   upsertSignal(input: SignalInput, audio?: Blob | null): Promise<Signal>;
   removeSignal(investorId: string, teamId: string): Promise<void>;
   saveTeam(input: SaveTeamInput): Promise<Team>;
   removeTeam(teamId: string): Promise<void>;
   savePerson(input: SavePersonInput): Promise<Person>;
   removePerson(personId: string): Promise<void>;
-  assignPersonToTeam(personId: string, teamId: string | null): Promise<void>;
   updateEvent(patch: Partial<FestivalEvent>): Promise<FestivalEvent>;
   advanceEvent(status: EventStatus): Promise<FestivalEvent>;
   resetDemo(): Promise<void>;

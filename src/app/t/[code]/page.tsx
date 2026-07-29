@@ -2,6 +2,7 @@
 
 import { AppShell } from "@/components/brand/AppShell";
 import { SignalForm } from "@/components/participant/SignalForm";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { isOwnTeam } from "@/lib/domain/rules";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowLeft, Home } from "lucide-react";
@@ -11,7 +12,7 @@ import { useEffect, useRef } from "react";
 
 export default function TeamPage() {
   const params = useParams<{ code: string }>();
-  const { commands, currentPerson, loading, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, snapshot } = useFestival();
   const visitMarked = useRef(false);
   const code = decodeURIComponent(params.code ?? "").toUpperCase();
   const team = snapshot?.teams.find(
@@ -19,15 +20,28 @@ export default function TeamPage() {
   );
 
   useEffect(() => {
-    if (!team || !currentPerson || visitMarked.current) return;
+    if (
+      !team ||
+      !currentPerson ||
+      !snapshot ||
+      snapshot.event.status !== "open" ||
+      isOwnTeam(currentPerson.id, team.id, snapshot) ||
+      visitMarked.current
+    ) {
+      return;
+    }
     visitMarked.current = true;
-    void commands.markVisit(currentPerson.id, team.id);
-  }, [commands, currentPerson, team]);
+    void commands.markVisit(team.id);
+  }, [commands, currentPerson, snapshot, team]);
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state"><span /><p>Hľadám tím…</p></main>
+        <InitialLoadState
+          error={error}
+          label="Hľadám tím…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }

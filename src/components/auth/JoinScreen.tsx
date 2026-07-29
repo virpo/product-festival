@@ -1,11 +1,19 @@
 "use client";
 
 import { ArrowRight, Eye, KeyRound, Sparkles, UserRound } from "lucide-react";
+import {
+  ACCESS_CODE_MAX_LENGTH,
+  normalizeAccessCode,
+} from "@/lib/domain/access-code";
+import {
+  AccessCodeInUseError,
+  type ClaimPersonOptions,
+} from "@/lib/repository/FestivalRepository";
 import { useState, type FormEvent } from "react";
 
 type JoinScreenProps = {
   mode: "demo" | "live";
-  onJoin: (code: string) => Promise<void>;
+  onJoin: (code: string, options: ClaimPersonOptions) => Promise<void>;
 };
 
 const demoEntries = [
@@ -19,15 +27,26 @@ export function JoinScreen({ mode, onJoin }: JoinScreenProps) {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [takeoverCode, setTakeoverCode] = useState<string | null>(null);
 
-  async function join(value: string) {
+  async function join(value: string, takeover = false) {
+    const normalizedCode = normalizeAccessCode(value);
     setLoading(true);
     setError("");
 
     try {
-      await onJoin(value.trim());
+      await onJoin(normalizedCode, { takeover });
+      setTakeoverCode(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Nepodarilo sa vstúpiť.");
+      if (reason instanceof AccessCodeInUseError) {
+        setTakeoverCode(normalizedCode);
+        setError(reason.message);
+      } else {
+        setTakeoverCode(null);
+        setError(
+          reason instanceof Error ? reason.message : "Nepodarilo sa vstúpiť.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -63,8 +82,12 @@ export function JoinScreen({ mode, onJoin }: JoinScreenProps) {
               autoCapitalize="characters"
               autoComplete="one-time-code"
               id="access-code"
-              maxLength={24}
-              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              maxLength={ACCESS_CODE_MAX_LENGTH}
+              onChange={(event) => {
+                setCode(normalizeAccessCode(event.target.value));
+                setTakeoverCode(null);
+                setError("");
+              }}
               placeholder="napr. PETER"
               required
               value={code}
@@ -74,6 +97,17 @@ export function JoinScreen({ mode, onJoin }: JoinScreenProps) {
             <p className="form-error" role="alert">
               {error}
             </p>
+          ) : null}
+          {takeoverCode ? (
+            <button
+              className="secondary-button join-takeover"
+              disabled={loading}
+              onClick={() => void join(takeoverCode, true)}
+              type="button"
+            >
+              Pokračovať na tomto zariadení
+              <ArrowRight aria-hidden="true" size={18} />
+            </button>
           ) : null}
           <button
             className="primary-button"
