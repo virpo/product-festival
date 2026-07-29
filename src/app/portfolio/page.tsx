@@ -2,17 +2,22 @@
 
 import { AppShell } from "@/components/brand/AppShell";
 import { Portfolio } from "@/components/participant/Portfolio";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function PortfolioPage() {
-  const { commands, currentPerson, loading, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, snapshot } = useFestival();
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state"><span /><p>Načítavam prehľad…</p></main>
+        <InitialLoadState
+          error={error}
+          label="Načítavam prehľad…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }

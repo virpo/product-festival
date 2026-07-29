@@ -11,12 +11,21 @@ import type {
   TeamMember,
   Visit,
 } from "@/lib/domain/types";
+import {
+  ACCESS_CODE_MAX_LENGTH,
+  normalizeAccessCode,
+} from "@/lib/domain/access-code";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import type {
   FestivalRepository,
+  ClaimPersonOptions,
+  RepositoryConnectionStatus,
   SavePersonInput,
   SaveTeamInput,
 } from "./FestivalRepository";
+import { AccessCodeInUseError } from "./FestivalRepository";
+
+export { AccessCodeInUseError } from "./FestivalRepository";
 
 type RepositoryOptions = {
   eventSlug: string;
@@ -24,9 +33,64 @@ type RepositoryOptions = {
 
 type Row = Record<string, unknown>;
 
+export const AUDIO_URL_TTL_SECONDS = 6 * 60 * 60;
+// Re-sign a little before expiry so a cached link cannot go stale mid-playback.
+const SIGNED_URL_REFRESH_MARGIN_MS = 5 * 60 * 1_000;
+
+// The reliability RPCs signal every rejected invariant as a bare PL/pgSQL
+// identifier. Without this map the organizer sees `membership_locked_after_signal`
+// mid-event and cannot tell what to do about it.
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  anonymous_auth_required: "Najprv sa prihlás a skús to znova.",
+  claim_access_code_first: "Najprv zadaj svoj prístupový kód.",
+  cannot_visit_own_team: "Vlastný tím sa nedá navštíviť.",
+  current_organizer_cannot_be_removed:
+    "Seba ako práve prihláseného organizátora nemôžeš odstrániť.",
+  current_organizer_role_required:
+    "Sebe ako práve prihlásenému organizátorovi nemôžeš zmeniť rolu.",
+  event_name_required: "Názov eventu nemôže byť prázdny.",
+  event_not_found: "Event sa nenašiel.",
+  invalid_access_code: "Prístupový kód musí mať 1 až 24 znakov.",
+  invalid_currency: "Mena môže mať najviac 3 znaky.",
+  invalid_event_settings: "Nastavenia eventu sú mimo povoleného rozsahu.",
+  invalid_wallet_budget: "Rozpočet nemôže byť negatívny.",
+  last_organizer_cannot_be_removed:
+    "Posledného organizátora nemôžeš odstrániť.",
+  last_organizer_role_required:
+    "Poslednému organizátorovi nemôžeš zmeniť rolu.",
+  membership_locked_after_signal:
+    "Tím sa už nedá zmeniť — tento človek už poslal feedback.",
+  organizer_access_required: "Túto akciu môže vykonať iba organizátor.",
+  person_name_required: "Meno nemôže byť prázdne.",
+  person_not_found: "Človek sa nenašiel.",
+  person_with_feedback_cannot_be_removed:
+    "Človeka, ktorý už poslal feedback, nemôžeš odstrániť.",
+  team_not_available: "Tím nie je dostupný.",
+  unknown_access_code: "Tento prístupový kód neexistuje.",
+  visits_closed: "Návštevy sa dajú zapisovať iba počas otvoreného eventu.",
+};
+
+function describeError(message: string): string | null {
+  for (const [identifier, translation] of Object.entries(RPC_ERROR_MESSAGES)) {
+    if (message.includes(identifier)) {
+      return translation;
+    }
+  }
+  // A duplicate access code trips a unique constraint rather than a raised
+  // exception, so it arrives as raw Postgres text.
+  if (
+    message.includes("access_codes_event_normalized_code_key") ||
+    message.includes("access_codes_event_id_code_key") ||
+    (message.includes("duplicate key") && message.includes("access_codes"))
+  ) {
+    return "Tento prístupový kód už používa iný človek.";
+  }
+  return null;
+}
+
 function fail(error: { message: string } | null, fallback: string) {
   if (error) {
-    throw new Error(error.message || fallback);
+    throw new Error(describeError(error.message) ?? (error.message || fallback));
   }
 }
 
@@ -192,17 +256,39 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     return mapEvent(data);
   }
 
+  // Signed links last six hours, so re-signing every recording on every snapshot
+  // is pure waste: an organizer device refreshes on invalidations and on the
+  // safety poll, and the cost grows with every recording in the event.
+  private readonly signedAudioUrls = new Map<
+    string,
+    { url: string; expiresAt: number }
+  >();
+
   private async withSignedAudio(signals: Signal[]): Promise<Signal[]> {
+    const now = Date.now();
+
     return Promise.all(
       signals.map(async (signal) => {
         if (!signal.audioPath) return signal;
+
+        const cached = this.signedAudioUrls.get(signal.audioPath);
+        if (cached && cached.expiresAt > now) {
+          return { ...signal, audioUrl: cached.url };
+        }
+
         const { data, error } = await this.client.storage
           .from("festival-feedback")
-          .createSignedUrl(signal.audioPath, 60 * 60);
-        return {
-          ...signal,
-          audioUrl: error ? null : data.signedUrl,
-        };
+          .createSignedUrl(signal.audioPath, AUDIO_URL_TTL_SECONDS);
+        if (error) {
+          return { ...signal, audioUrl: null };
+        }
+
+        this.signedAudioUrls.set(signal.audioPath, {
+          url: data.signedUrl,
+          expiresAt:
+            now + AUDIO_URL_TTL_SECONDS * 1_000 - SIGNED_URL_REFRESH_MARGIN_MS,
+        });
+        return { ...signal, audioUrl: data.signedUrl };
       }),
     );
   }
@@ -287,7 +373,10 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     return data ? mapPerson(data) : null;
   }
 
-  subscribe(listener: () => void): () => void {
+  subscribe(
+    listener: () => void,
+    connectionListener?: (status: RepositoryConnectionStatus) => void,
+  ): () => void {
     const channel: RealtimeChannel = this.client
       .channel(`festival-${this.options.eventSlug}`)
       .on(
@@ -305,23 +394,55 @@ export class SupabaseFestivalRepository implements FestivalRepository {
         { event: "*", schema: "public", table: "event_stats" },
         listener,
       )
-      .subscribe();
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "teams" },
+        listener,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "people" },
+        listener,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "team_members" },
+        listener,
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          connectionListener?.("connected");
+        } else if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          connectionListener?.("disconnected");
+        }
+      });
 
     return () => {
       void channel.unsubscribe();
     };
   }
 
-  async claimPerson(accessCode: string): Promise<Person> {
+  async claimPerson(
+    accessCode: string,
+    options: ClaimPersonOptions = {},
+  ): Promise<Person> {
     const session = await this.client.auth.getSession();
     if (!session.data.session) {
       const { error } = await this.client.auth.signInAnonymously();
       fail(error, "Anonymné prihlásenie zlyhalo.");
     }
     const { data, error } = await this.client.rpc("claim_person", {
+      allow_takeover: options.takeover ?? false,
       claim_code: accessCode.trim().toUpperCase(),
       claim_event_slug: this.options.eventSlug,
     });
+    if (error?.message.includes("access_code_in_use")) {
+      throw new AccessCodeInUseError();
+    }
     fail(error, "Neznámy prístupový kód.");
     const row = Array.isArray(data) ? data[0] : data;
     return mapPerson(row, accessCode.trim().toUpperCase());
@@ -347,19 +468,35 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     fail(error, "Prítomnosť sa nepodarilo uložiť.");
   }
 
-  async markVisit(personId: string, teamId: string): Promise<void> {
+  async markVisit(teamId: string): Promise<void> {
     const event = await this.getEvent();
-    const now = new Date().toISOString();
-    const { error } = await this.client.from("visits").upsert(
-      {
-        event_id: event.id,
-        person_id: personId,
-        team_id: teamId,
-        last_visited_at: now,
-      },
-      { onConflict: "event_id,person_id,team_id" },
-    );
+    const { error } = await this.client.rpc("record_visit", {
+      target_event_id: event.id,
+      target_team_id: teamId,
+    });
     fail(error, "Návštevu sa nepodarilo uložiť.");
+  }
+
+  // `true` when the stored signal already references this path, `false` when it
+  // provably does not, and `null` when the lookup itself failed and the outcome
+  // stays unknown.
+  private async audioPathCommitted(
+    eventId: string,
+    investorId: string,
+    teamId: string,
+    audioPath: string,
+  ): Promise<boolean | null> {
+    const { data, error } = await this.client
+      .from("signals")
+      .select("audio_path")
+      .eq("event_id", eventId)
+      .eq("investor_id", investorId)
+      .eq("team_id", teamId)
+      .maybeSingle();
+    if (error) {
+      return null;
+    }
+    return stringValue(data?.audio_path) === audioPath;
   }
 
   async upsertSignal(input: SignalInput, audio?: Blob | null): Promise<Signal> {
@@ -397,7 +534,22 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     });
     if (error) {
       if (audioPath && audio) {
-        await this.client.storage.from("festival-feedback").remove([audioPath]);
+        // The error may be a lost response for a transaction the database
+        // already committed. Removing the object then leaves a committed signal
+        // pointing at a deleted recording and the feedback is gone for good, so
+        // delete only once we positively know the database did not adopt it.
+        // An orphaned object is recoverable; a missing referenced one is not.
+        const committed = await this.audioPathCommitted(
+          event.id,
+          input.investorId,
+          input.teamId,
+          audioPath,
+        );
+        if (committed === false) {
+          await this.client.storage
+            .from("festival-feedback")
+            .remove([audioPath]);
+        }
       }
       fail(error, "Feedback sa nepodarilo uložiť.");
     }
@@ -463,29 +615,27 @@ export class SupabaseFestivalRepository implements FestivalRepository {
 
   async savePerson(input: SavePersonInput): Promise<Person> {
     const event = await this.getEvent();
-    const code = (input.accessCode || generateCode(input.name))
-      .trim()
-      .toUpperCase();
-    const payload = {
-      event_id: event.id,
-      name: input.name.trim(),
-      role: input.role,
-      wallet_budget: input.walletBudget,
-    };
-    const query = input.id
-      ? this.client.from("people").update(payload).eq("id", input.id)
-      : this.client.from("people").insert(payload);
-    const { data, error } = await query.select("*").single();
-    fail(error, "Človeka sa nepodarilo uložiť.");
-    const person = mapPerson(data, code);
-    const { error: codeError } = await this.client.from("access_codes").upsert({
-      person_id: person.id,
-      event_id: event.id,
-      code,
+    const code = normalizeAccessCode(
+      input.accessCode || generateCode(input.name),
+    );
+
+    if (code.length > ACCESS_CODE_MAX_LENGTH) {
+      throw new Error(
+        `Prístupový kód môže mať najviac ${ACCESS_CODE_MAX_LENGTH} znakov.`,
+      );
+    }
+
+    const { data, error } = await this.client.rpc("save_person", {
+      target_access_code: code,
+      target_event_id: event.id,
+      target_name: input.name.trim(),
+      target_person_id: input.id ?? null,
+      target_role: input.role,
+      target_team_id: input.teamId ?? null,
+      target_wallet_budget: input.walletBudget,
     });
-    fail(codeError, "Prístupový kód sa nepodarilo uložiť.");
-    await this.assignPersonToTeam(person.id, input.teamId ?? null);
-    return person;
+    fail(error, "Človeka sa nepodarilo uložiť.");
+    return mapPerson(data, code);
   }
 
   async removePerson(personId: string): Promise<void> {
@@ -495,41 +645,19 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     fail(error, "Človeka sa nepodarilo odstrániť.");
   }
 
-  async assignPersonToTeam(
-    personId: string,
-    teamId: string | null,
-  ): Promise<void> {
-    const event = await this.getEvent();
-    const { error: deleteError } = await this.client
-      .from("team_members")
-      .delete()
-      .eq("event_id", event.id)
-      .eq("person_id", personId);
-    fail(deleteError, "Priradenie sa nepodarilo zmeniť.");
-    if (!teamId) return;
-    const { error } = await this.client.from("team_members").insert({
-      event_id: event.id,
-      person_id: personId,
-      team_id: teamId,
-    });
-    fail(error, "Priradenie sa nepodarilo uložiť.");
-  }
-
   async updateEvent(patch: Partial<FestivalEvent>): Promise<FestivalEvent> {
     const event = await this.getEvent();
-    const payload: Row = {};
-    if (patch.name !== undefined) payload.name = patch.name;
-    if (patch.currency !== undefined) payload.currency = patch.currency;
-    if (patch.walletDefault !== undefined) payload.wallet_default = patch.walletDefault;
-    if (patch.maxPerTeam !== undefined) payload.max_per_team = patch.maxPerTeam;
-    if (patch.coverageTarget !== undefined) payload.coverage_target = patch.coverageTarget;
-    if (patch.locksAt !== undefined) payload.locks_at = patch.locksAt;
-    const { data, error } = await this.client
-      .from("events")
-      .update(payload)
-      .eq("id", event.id)
-      .select("*")
-      .single();
+    const { data, error } = await this.client.rpc("update_event_settings", {
+      target_coverage_target:
+        patch.coverageTarget ?? event.coverageTarget,
+      target_currency: patch.currency ?? event.currency,
+      target_event_id: event.id,
+      target_locks_at:
+        patch.locksAt === undefined ? event.locksAt : patch.locksAt,
+      target_max_per_team: patch.maxPerTeam ?? event.maxPerTeam,
+      target_name: patch.name ?? event.name,
+      target_wallet_default: patch.walletDefault ?? event.walletDefault,
+    });
     fail(error, "Nastavenia sa nepodarilo uložiť.");
     return mapEvent(data);
   }

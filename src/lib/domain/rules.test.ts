@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { remainingWallet, validateSignal } from "./rules";
+import { remainingWallet, validateSignal, validateVisit } from "./rules";
 import type { FestivalSnapshot, SignalInput } from "./types";
 
 const now = "2026-07-24T12:00:00.000Z";
@@ -199,5 +199,29 @@ describe("validateSignal", () => {
       validateSignal({ ...validSignal, amount: 40 }, snapshot).amount,
     ).toBe(40);
     expect(remainingWallet("person-2", snapshot)).toBe(75);
+  });
+});
+
+describe("validateVisit", () => {
+  it("accepts an active, foreign team while investing is open", () => {
+    expect(validateVisit("person-2", "team-1", makeSnapshot()).id).toBe(
+      "team-1",
+    );
+  });
+
+  it("rejects own-team and closed-event visits", () => {
+    expect(() =>
+      validateVisit("person-1", "team-1", makeSnapshot()),
+    ).toThrow("Vlastný tím sa do návštev nepočíta.");
+
+    expect(() =>
+      validateVisit(
+        "person-2",
+        "team-1",
+        makeSnapshot({
+          event: { ...makeSnapshot().event, status: "locked" },
+        }),
+      ),
+    ).toThrow("Návštevy sa už nezapisujú.");
   });
 });

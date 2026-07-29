@@ -2,22 +2,27 @@
 
 import { AppShell } from "@/components/brand/AppShell";
 import { TeamReceipt } from "@/components/results/TeamReceipt";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 export default function ResultsPage() {
-  const { currentPerson, loading, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, snapshot } = useFestival();
   const ownTeamId =
     currentPerson &&
     snapshot?.teamMembers.find((item) => item.personId === currentPerson.id)?.teamId;
   const [adminTeamId, setAdminTeamId] = useState<string | null>(null);
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state"><span /><p>Načítavam feedback…</p></main>
+        <InitialLoadState
+          error={error}
+          label="Načítavam feedback…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }

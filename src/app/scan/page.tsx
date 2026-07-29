@@ -2,17 +2,22 @@
 
 import { AppShell } from "@/components/brand/AppShell";
 import { QrScanner } from "@/components/participant/QrScanner";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function ScanPage() {
-  const { currentPerson, loading, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, snapshot } = useFestival();
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state"><span /><p>Zapínam skener…</p></main>
+        <InitialLoadState
+          error={error}
+          label="Zapínam skener…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }

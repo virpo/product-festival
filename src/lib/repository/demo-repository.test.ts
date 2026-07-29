@@ -58,13 +58,67 @@ describe("DemoFestivalRepository", () => {
     const person = await repo.claimPerson("MENTOR");
     const team = (await repo.getSnapshot()).teams[0];
 
-    await repo.markVisit(person.id, team.id);
-    await repo.markVisit(person.id, team.id);
+    await repo.markVisit(team.id);
+    await repo.markVisit(team.id);
 
     const visits = (await repo.getSnapshot()).visits.filter(
       (visit) => visit.personId === person.id && visit.teamId === team.id,
     );
     expect(visits).toHaveLength(1);
+  });
+
+  it("rejects own-team visits and visits after lock", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const ownTeamId = snapshot.teamMembers.find(
+      (member) => member.personId === person.id,
+    )!.teamId;
+
+    await expect(repo.markVisit(ownTeamId)).rejects.toThrow(
+      "Vlastný tím sa do návštev nepočíta.",
+    );
+
+    await repo.advanceEvent("locked");
+    await expect(repo.markVisit(snapshot.teams[1].id)).rejects.toThrow(
+      "Návštevy sa už nezapisujú.",
+    );
+  });
+
+  it("keeps membership fixed after a person has sent feedback", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const mentor = await repo.claimPerson("MENTOR");
+    const snapshot = await repo.getSnapshot();
+
+    await expect(
+      repo.savePerson({
+        id: mentor.id,
+        name: mentor.name,
+        role: mentor.role,
+        walletBudget: mentor.walletBudget,
+        accessCode: mentor.accessCode,
+        teamId: snapshot.teams[2].id,
+      }),
+    ).rejects.toThrow("Tím už nemožno zmeniť po odoslaní feedbacku.");
+  });
+
+  it("does not remove or demote the current organizer", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const organizer = await repo.claimPerson("ADMIN");
+
+    await expect(repo.removePerson(organizer.id)).rejects.toThrow(
+      "Aktuálneho organizátora nemožno odstrániť.",
+    );
+    await expect(
+      repo.savePerson({
+        id: organizer.id,
+        name: organizer.name,
+        role: "participant",
+        walletBudget: organizer.walletBudget,
+        accessCode: organizer.accessCode,
+        teamId: null,
+      }),
+    ).rejects.toThrow("Aktuálny organizátor musí zostať organizátorom.");
   });
 
   it("advances the event forward and rejects skipping states", async () => {
@@ -86,7 +140,7 @@ describe("DemoFestivalRepository", () => {
       (candidate) => candidate.code === "LEDGER8",
     )!;
 
-    await repo.markVisit(person.id, team.id);
+    await repo.markVisit(team.id);
     await repo.upsertSignal({
       investorId: person.id,
       teamId: team.id,

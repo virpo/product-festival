@@ -2,16 +2,21 @@
 
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AppShell } from "@/components/brand/AppShell";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 import Link from "next/link";
 
 export default function AdminPage() {
-  const { commands, currentPerson, loading, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, snapshot } = useFestival();
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state"><span /><p>Načítavam administráciu…</p></main>
+        <InitialLoadState
+          error={error}
+          label="Načítavam administráciu…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }
@@ -31,6 +36,7 @@ export default function AdminPage() {
     <AppShell mode={mode}>
       <AdminDashboard
         commands={commands}
+        currentPerson={currentPerson}
         isDemo={mode === "demo"}
         snapshot={snapshot}
       />

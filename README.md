@@ -130,8 +130,9 @@ Then:
 
 The browser receives only the publishable key. Never add a service-role key to
 this app. Raw feedback and audio are protected by RLS and a private Storage
-bucket. Realtime subscriptions expose only the event lifecycle and aggregate
-`event_stats`.
+bucket. Realtime publishes shared room state only: event lifecycle, aggregate
+stats, teams, people and team membership. It never publishes access codes,
+visits, signals or audio metadata.
 
 Official references:
 [anonymous auth](https://supabase.com/docs/guides/auth/auth-anonymous),
@@ -147,6 +148,22 @@ Official references:
 
 Transitions only move forward. A public screen never exposes team totals or a
 ranking.
+
+## Live-event recovery
+
+- Give every organizer a separate organizer code. Do not share one logged-in
+  organizer identity across devices.
+- An access code belongs to one active browser. A second browser must explicitly
+  take it over; the previous browser returns to entry after its next refresh.
+- Person, access-code and team-assignment edits are one atomic operation.
+- The browser refetches after Realtime changes. If the connection drops, it
+  keeps the last snapshot visible, warns that it may be stale, and retries after
+  roughly 2 seconds, 5 seconds, then every 30 seconds. Each delay carries up to
+  25% jitter so a venue-wide outage does not reconnect every phone on the same
+  tick, so the observed waits reach about 2.5, 6 and 37 seconds.
+- Locking and releasing are separate manual actions. A reconnect never advances
+  the event automatically.
+- Fresh recording links last six hours. Reloading results creates fresh links.
 
 ## Deploy
 

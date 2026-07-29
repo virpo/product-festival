@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, LogOut, Settings2 } from "lucide-react";
 import { AppShell } from "@/components/brand/AppShell";
 import { ParticipantHome } from "@/components/participant/ParticipantHome";
+import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
 import { JoinScreen } from "./JoinScreen";
 
@@ -12,18 +13,18 @@ export function FestivalEntry() {
     commands,
     currentPerson,
     error,
-    loading,
     mode,
     snapshot,
   } = useFestival();
 
-  if (loading || !snapshot) {
+  if (!snapshot) {
     return (
       <AppShell mode={mode}>
-        <main className="loading-state">
-          <span />
-          <p>Pripravujem festival…</p>
-        </main>
+        <InitialLoadState
+          error={error}
+          label="Pripravujem festival…"
+          onRetry={commands.refresh}
+        />
       </AppShell>
     );
   }

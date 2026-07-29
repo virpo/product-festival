@@ -8,9 +8,18 @@ import type {
   SignalInput,
   Team,
 } from "@/lib/domain/types";
-import { validateSignal } from "@/lib/domain/rules";
+import {
+  validateSignal,
+  validateTeamAssignment,
+  validateVisit,
+} from "@/lib/domain/rules";
+import {
+  ACCESS_CODE_MAX_LENGTH,
+  normalizeAccessCode,
+} from "@/lib/domain/access-code";
 import {
   type FestivalRepository,
+  type RepositoryConnectionStatus,
   type SavePersonInput,
   type SaveTeamInput,
   type StorageLike,
@@ -111,8 +120,12 @@ export class DemoFestivalRepository implements FestivalRepository {
     return this.read().people.find((person) => person.id === id) ?? null;
   }
 
-  subscribe(listener: () => void): () => void {
+  subscribe(
+    listener: () => void,
+    connectionListener?: (status: RepositoryConnectionStatus) => void,
+  ): () => void {
     this.listeners.add(listener);
+    connectionListener?.("connected");
     return () => this.listeners.delete(listener);
   }
 
@@ -148,8 +161,15 @@ export class DemoFestivalRepository implements FestivalRepository {
     }
   }
 
-  async markVisit(personId: string, teamId: string): Promise<void> {
+  async markVisit(teamId: string): Promise<void> {
     const snapshot = this.read();
+    const personId = this.storage.getItem(PERSON_KEY);
+
+    if (!personId) {
+      throw new Error("Najprv sa prihlás.");
+    }
+
+    validateVisit(personId, teamId, snapshot);
     const now = new Date().toISOString();
     const existing = snapshot.visits.find(
       (visit) => visit.personId === personId && visit.teamId === teamId,
@@ -290,15 +310,43 @@ export class DemoFestivalRepository implements FestivalRepository {
   async savePerson(input: SavePersonInput): Promise<Person> {
     const snapshot = this.read();
     const existing = snapshot.people.find((person) => person.id === input.id);
+    const currentPersonId = this.storage.getItem(PERSON_KEY);
+    const accessCode = normalizeAccessCode(
+      input.accessCode || existing?.accessCode || makeCode(input.name),
+    );
+
+    if (accessCode.length > ACCESS_CODE_MAX_LENGTH) {
+      throw new Error(
+        `Prístupový kód môže mať najviac ${ACCESS_CODE_MAX_LENGTH} znakov.`,
+      );
+    }
 
     if (existing) {
+      if (
+        existing.id === currentPersonId &&
+        existing.role === "organizer" &&
+        input.role !== "organizer"
+      ) {
+        throw new Error("Aktuálny organizátor musí zostať organizátorom.");
+      }
+
+      if (
+        existing.role === "organizer" &&
+        input.role !== "organizer" &&
+        snapshot.people.filter((person) => person.role === "organizer").length <=
+          1
+      ) {
+        throw new Error("Posledný organizátor musí zostať organizátorom.");
+      }
+
+      validateTeamAssignment(existing.id, input.teamId, snapshot);
       Object.assign(existing, {
         name: input.name.trim(),
         role: input.role,
         walletBudget: input.walletBudget,
-        accessCode: (input.accessCode || existing.accessCode).trim().toUpperCase(),
+        accessCode,
       });
-      await this.assignWithinSnapshot(snapshot, existing.id, input.teamId);
+      this.assignWithinSnapshot(snapshot, existing.id, input.teamId);
       this.write(snapshot);
       return structuredClone(existing);
     }
@@ -309,21 +357,37 @@ export class DemoFestivalRepository implements FestivalRepository {
       name: input.name.trim(),
       role: input.role,
       walletBudget: input.walletBudget,
-      accessCode: (input.accessCode || makeCode(input.name))
-        .trim()
-        .toUpperCase(),
+      accessCode,
       authUserId: null,
       lastSeenAt: null,
       createdAt: new Date().toISOString(),
     };
+    validateTeamAssignment(person.id, input.teamId, snapshot);
     snapshot.people.push(person);
-    await this.assignWithinSnapshot(snapshot, person.id, input.teamId);
+    this.assignWithinSnapshot(snapshot, person.id, input.teamId);
     this.write(snapshot);
     return structuredClone(person);
   }
 
   async removePerson(personId: string): Promise<void> {
     const snapshot = this.read();
+    const person = snapshot.people.find((candidate) => candidate.id === personId);
+
+    if (!person) {
+      return;
+    }
+
+    if (this.storage.getItem(PERSON_KEY) === personId) {
+      throw new Error("Aktuálneho organizátora nemožno odstrániť.");
+    }
+
+    if (
+      person.role === "organizer" &&
+      snapshot.people.filter((candidate) => candidate.role === "organizer")
+        .length <= 1
+    ) {
+      throw new Error("Posledného organizátora nemožno odstrániť.");
+    }
 
     if (snapshot.signals.some((signal) => signal.investorId === personId)) {
       throw new Error("Človeka so spätnou väzbou už nemožno odstrániť.");
@@ -339,7 +403,7 @@ export class DemoFestivalRepository implements FestivalRepository {
     this.write(snapshot);
   }
 
-  private async assignWithinSnapshot(
+  private assignWithinSnapshot(
     snapshot: FestivalSnapshot,
     personId: string,
     teamId: string | null | undefined,
@@ -360,15 +424,6 @@ export class DemoFestivalRepository implements FestivalRepository {
         teamId,
       });
     }
-  }
-
-  async assignPersonToTeam(
-    personId: string,
-    teamId: string | null,
-  ): Promise<void> {
-    const snapshot = this.read();
-    await this.assignWithinSnapshot(snapshot, personId, teamId);
-    this.write(snapshot);
   }
 
   async updateEvent(

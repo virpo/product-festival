@@ -9,7 +9,6 @@ import { EventOverview } from "./EventOverview";
 function commands() {
   return {
     advanceEvent: vi.fn().mockResolvedValue(undefined),
-    assignPersonToTeam: vi.fn().mockResolvedValue(undefined),
     removePerson: vi.fn().mockResolvedValue(undefined),
     removeTeam: vi.fn().mockResolvedValue(undefined),
     resetDemo: vi.fn().mockResolvedValue(undefined),
@@ -21,11 +20,20 @@ function commands() {
 
 describe("AdminDashboard", () => {
   const snapshot = createDemoSnapshot(new Date("2026-07-24T10:00:00Z"));
+  const organizer = snapshot.people.find(
+    (person) => person.role === "organizer",
+  )!;
 
   it("adds a mentor with a custom wallet", async () => {
     const user = userEvent.setup();
     const actions = commands();
-    render(<AdminDashboard commands={actions} snapshot={snapshot} />);
+    render(
+      <AdminDashboard
+        commands={actions}
+        currentPerson={organizer}
+        snapshot={snapshot}
+      />,
+    );
 
     await user.click(screen.getByRole("tab", { name: "Ľudia" }));
     await user.click(screen.getByRole("button", { name: "Pridať človeka" }));
@@ -42,6 +50,34 @@ describe("AdminDashboard", () => {
         walletBudget: 150,
       }),
     );
+  });
+
+  it("does not offer to delete the current organizer", async () => {
+    const user = userEvent.setup();
+    const actions = commands();
+    render(
+      <AdminDashboard
+        commands={actions}
+        currentPerson={organizer}
+        snapshot={snapshot}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Ľudia" }));
+
+    expect(
+      screen.queryByRole("button", {
+        name: `Odstrániť ${organizer.name}`,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Odstrániť Peter" }),
+    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: `Upraviť ${organizer.name}` }),
+    );
+    expect(screen.getByLabelText("Rola")).toBeDisabled();
   });
 
   it("separates lock and release controls", () => {

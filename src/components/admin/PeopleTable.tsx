@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  ACCESS_CODE_MAX_LENGTH,
+  normalizeAccessCode,
+} from "@/lib/domain/access-code";
 import type { FestivalSnapshot, Person, PersonRole } from "@/lib/domain/types";
 import type { SavePersonInput } from "@/lib/repository/FestivalRepository";
 import { KeyRound, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -8,7 +12,6 @@ import { useState, type FormEvent } from "react";
 type PeopleCommands = {
   savePerson(input: SavePersonInput): Promise<void>;
   removePerson(personId: string): Promise<void>;
-  assignPersonToTeam(personId: string, teamId: string | null): Promise<void>;
 };
 
 const roles: { value: PersonRole; label: string }[] = [
@@ -20,9 +23,11 @@ const roles: { value: PersonRole; label: string }[] = [
 
 export function PeopleTable({
   snapshot,
+  currentPerson,
   commands,
 }: {
   snapshot: FestivalSnapshot;
+  currentPerson: Person;
   commands: PeopleCommands;
 }) {
   const [form, setForm] = useState<SavePersonInput | null>(null);
@@ -62,7 +67,16 @@ export function PeopleTable({
 
   async function remove(person: Person) {
     if (!window.confirm(`Odstrániť ${person.name}?`)) return;
-    await commands.removePerson(person.id);
+    setError("");
+    try {
+      await commands.removePerson(person.id);
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Človeka sa nepodarilo odstrániť.",
+      );
+    }
   }
 
   return (
@@ -113,6 +127,7 @@ export function PeopleTable({
               <select
                 aria-label="Rola"
                 className="field-select"
+                disabled={form.id === currentPerson.id}
                 onChange={(event) =>
                   setForm({ ...form, role: event.target.value as PersonRole })
                 }
@@ -141,8 +156,12 @@ export function PeopleTable({
               Prístupový kód
               <input
                 className="field-input code-input"
+                maxLength={ACCESS_CODE_MAX_LENGTH}
                 onChange={(event) =>
-                  setForm({ ...form, accessCode: event.target.value.toUpperCase() })
+                  setForm({
+                    ...form,
+                    accessCode: normalizeAccessCode(event.target.value),
+                  })
                 }
                 placeholder="Vytvorí sa automaticky"
                 value={form.accessCode ?? ""}
@@ -198,9 +217,11 @@ export function PeopleTable({
                       <button aria-label={`Upraviť ${person.name}`} onClick={() => edit(person)} type="button">
                         <Pencil aria-hidden="true" size={15} />
                       </button>
-                      <button aria-label={`Odstrániť ${person.name}`} onClick={() => void remove(person)} type="button">
-                        <Trash2 aria-hidden="true" size={15} />
-                      </button>
+                      {person.id !== currentPerson.id ? (
+                        <button aria-label={`Odstrániť ${person.name}`} onClick={() => void remove(person)} type="button">
+                          <Trash2 aria-hidden="true" size={15} />
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
