@@ -31,7 +31,13 @@ export default function TeamPage() {
       return;
     }
     visitMarked.current = true;
-    void commands.markVisit(team.id);
+    // `record_visit` is an idempotent upsert, so a failed attempt must not stay
+    // marked as done — otherwise a scan during a brief outage silently loses the
+    // visit for the lifetime of this page. Releasing the guard lets the next
+    // snapshot refresh retry it.
+    void commands.markVisit(team.id).catch(() => {
+      visitMarked.current = false;
+    });
   }, [commands, currentPerson, snapshot, team]);
 
   if (!snapshot) {
