@@ -16,7 +16,8 @@ const VISIT_MAX_ATTEMPTS = 3;
 
 export default function TeamPage() {
   const params = useParams<{ code: string }>();
-  const { commands, currentPerson, error, mode, snapshot } = useFestival();
+  const { commands, connection, currentPerson, error, mode, snapshot } =
+    useFestival();
   // Keyed by person and team: this route component can be preserved across
   // `[code]` changes, and a plain boolean would then suppress the next team's
   // visit for the rest of the session.
@@ -34,6 +35,26 @@ export default function TeamPage() {
 
   const visitKey =
     currentPerson && team ? `${currentPerson.id}:${team.id}` : null;
+
+  // A scan during a brief outage would otherwise burn the whole attempt budget
+  // before the network returns and stay latched for good. Re-arm on the
+  // transition back to live only, so a persistently failing RPC still cannot spin.
+  const lastConnection = useRef(connection.status);
+  useEffect(() => {
+    if (lastConnection.current === connection.status) {
+      return;
+    }
+    lastConnection.current = connection.status;
+
+    if (
+      connection.status === "live" &&
+      visitState.current.attempts > 0 &&
+      !visitState.current.done
+    ) {
+      visitState.current.attempts = 0;
+      setVisitRetry((value) => value + 1);
+    }
+  }, [connection.status]);
 
   useEffect(() => {
     if (

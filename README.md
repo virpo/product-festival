@@ -158,7 +158,9 @@ ranking.
 - Person, access-code and team-assignment edits are one atomic operation.
 - The browser refetches after Realtime changes. If the connection drops, it
   keeps the last snapshot visible, warns that it may be stale, and retries after
-  2 seconds, 5 seconds, then every 30 seconds.
+  roughly 2 seconds, 5 seconds, then every 30 seconds. Each delay carries up to
+  25% jitter so a venue-wide outage does not reconnect every phone on the same
+  tick, so the observed waits reach about 2.5, 6 and 37 seconds.
 - Locking and releasing are separate manual actions. A reconnect never advances
   the event automatically.
 - Fresh recording links last six hours. Reloading results creates fresh links.
