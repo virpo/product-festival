@@ -35,9 +35,60 @@ type Row = Record<string, unknown>;
 
 export const AUDIO_URL_TTL_SECONDS = 6 * 60 * 60;
 
+// The reliability RPCs signal every rejected invariant as a bare PL/pgSQL
+// identifier. Without this map the organizer sees `membership_locked_after_signal`
+// mid-event and cannot tell what to do about it.
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  anonymous_auth_required: "Najprv sa prihlás a skús to znova.",
+  claim_access_code_first: "Najprv zadaj svoj prístupový kód.",
+  cannot_visit_own_team: "Vlastný tím sa nedá navštíviť.",
+  current_organizer_cannot_be_removed:
+    "Seba ako práve prihláseného organizátora nemôžeš odstrániť.",
+  current_organizer_role_required:
+    "Sebe ako práve prihlásenému organizátorovi nemôžeš zmeniť rolu.",
+  event_name_required: "Názov eventu nemôže byť prázdny.",
+  event_not_found: "Event sa nenašiel.",
+  invalid_access_code: "Prístupový kód musí mať 1 až 24 znakov.",
+  invalid_currency: "Mena môže mať najviac 3 znaky.",
+  invalid_event_settings: "Nastavenia eventu sú mimo povoleného rozsahu.",
+  invalid_wallet_budget: "Rozpočet nemôže byť negatívny.",
+  last_organizer_cannot_be_removed:
+    "Posledného organizátora nemôžeš odstrániť.",
+  last_organizer_role_required:
+    "Poslednému organizátorovi nemôžeš zmeniť rolu.",
+  membership_locked_after_signal:
+    "Tím sa už nedá zmeniť — tento človek už poslal feedback.",
+  organizer_access_required: "Túto akciu môže vykonať iba organizátor.",
+  person_name_required: "Meno nemôže byť prázdne.",
+  person_not_found: "Človek sa nenašiel.",
+  person_with_feedback_cannot_be_removed:
+    "Človeka, ktorý už poslal feedback, nemôžeš odstrániť.",
+  team_not_available: "Tím nie je dostupný.",
+  unknown_access_code: "Tento prístupový kód neexistuje.",
+  visits_closed: "Návštevy sa dajú zapisovať iba počas otvoreného eventu.",
+};
+
+function describeError(message: string): string | null {
+  for (const [identifier, translation] of Object.entries(RPC_ERROR_MESSAGES)) {
+    if (message.includes(identifier)) {
+      return translation;
+    }
+  }
+  // A duplicate access code trips a unique constraint rather than a raised
+  // exception, so it arrives as raw Postgres text.
+  if (
+    message.includes("access_codes_event_normalized_code_key") ||
+    message.includes("access_codes_event_id_code_key") ||
+    (message.includes("duplicate key") && message.includes("access_codes"))
+  ) {
+    return "Tento prístupový kód už používa iný človek.";
+  }
+  return null;
+}
+
 function fail(error: { message: string } | null, fallback: string) {
   if (error) {
-    throw new Error(error.message || fallback);
+    throw new Error(describeError(error.message) ?? (error.message || fallback));
   }
 }
 
@@ -402,6 +453,28 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     fail(error, "Návštevu sa nepodarilo uložiť.");
   }
 
+  // `true` when the stored signal already references this path, `false` when it
+  // provably does not, and `null` when the lookup itself failed and the outcome
+  // stays unknown.
+  private async audioPathCommitted(
+    eventId: string,
+    investorId: string,
+    teamId: string,
+    audioPath: string,
+  ): Promise<boolean | null> {
+    const { data, error } = await this.client
+      .from("signals")
+      .select("audio_path")
+      .eq("event_id", eventId)
+      .eq("investor_id", investorId)
+      .eq("team_id", teamId)
+      .maybeSingle();
+    if (error) {
+      return null;
+    }
+    return stringValue(data?.audio_path) === audioPath;
+  }
+
   async upsertSignal(input: SignalInput, audio?: Blob | null): Promise<Signal> {
     const event = await this.getEvent();
     const { data: existingData } = await this.client
@@ -437,7 +510,22 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     });
     if (error) {
       if (audioPath && audio) {
-        await this.client.storage.from("festival-feedback").remove([audioPath]);
+        // The error may be a lost response for a transaction the database
+        // already committed. Removing the object then leaves a committed signal
+        // pointing at a deleted recording and the feedback is gone for good, so
+        // delete only once we positively know the database did not adopt it.
+        // An orphaned object is recoverable; a missing referenced one is not.
+        const committed = await this.audioPathCommitted(
+          event.id,
+          input.investorId,
+          input.teamId,
+          audioPath,
+        );
+        if (committed === false) {
+          await this.client.storage
+            .from("festival-feedback")
+            .remove([audioPath]);
+        }
       }
       fail(error, "Feedback sa nepodarilo uložiť.");
     }
