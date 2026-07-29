@@ -141,13 +141,22 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         // exactly one follow-up fetch.
         if (snapshotDirty.current && !refreshQueued.current) {
           snapshotDirty.current = false;
-          // Route the follow-up through recovery. A bare refresh would swallow
+          // Route the follow-up through recovery: a bare refresh would swallow
           // its failure, so this request could mark the connection live while
           // the read that actually mattered never landed.
-          refreshQueued.current = Promise.resolve().then(() => {
-            refreshQueued.current = null;
-            return recoverRef.current().catch(() => undefined);
-          });
+          //
+          // Stay non-null until the follow-up finishes, so a writer awaiting
+          // read-your-write can observe it. `refreshInFlight` was cleared above,
+          // so this starts a genuinely new fetch.
+          refreshQueued.current = (async () => {
+            try {
+              await recoverRef.current();
+            } catch {
+              // Recovery owns the retry; awaiters must not see a rejection.
+            } finally {
+              refreshQueued.current = null;
+            }
+          })();
         }
       });
 
@@ -225,6 +234,15 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   const refreshAfterWrite = useCallback(async () => {
     snapshotDirty.current = true;
     await refreshWithRecovery();
+
+    // Joining a request that started before the write only guarantees that a
+    // follow-up gets scheduled, not that it finished. Await it too, so a caller
+    // that closes a form or reports success on resolve is really looking at
+    // post-write state.
+    const queued = refreshQueued.current;
+    if (queued) {
+      await queued;
+    }
   }, [refreshWithRecovery]);
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemoSnapshot } from "./demo-data";
 import type { FestivalRepository } from "./FestivalRepository";
@@ -312,6 +313,120 @@ describe("FestivalProvider retry recovery", () => {
     expect(getSnapshot.mock.calls.length - afterInitialLoad).toBeLessThanOrEqual(
       5,
     );
+  });
+
+  it("keeps a write pending until a snapshot taken after it resolves", async () => {
+    const snapshot = createDemoSnapshot();
+    let releaseFirst: () => void = () => undefined;
+    let releaseSecond: () => void = () => undefined;
+    const getSnapshot = vi
+      .fn()
+      // A refresh that began before the write.
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve(snapshot);
+          }),
+      )
+      // The post-write follow-up.
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseSecond = () => resolve(snapshot);
+          }),
+      )
+      .mockResolvedValue(snapshot);
+
+    const saveTeam = vi.fn().mockResolvedValue(undefined);
+    const subscribe = vi.fn(
+      (
+        _listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    type Commands = ReturnType<typeof useFestival>["commands"];
+
+    function CommandProbe({ onReady }: { onReady: (value: Commands) => void }) {
+      const { commands } = useFestival();
+
+      useEffect(() => {
+        onReady(commands);
+      }, [commands, onReady]);
+
+      return null;
+    }
+
+    let captured: Commands | null = null;
+    const handleReady = (value: Commands) => {
+      captured = value;
+    };
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi.fn().mockResolvedValue(null),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence: vi.fn(),
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam,
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <CommandProbe onReady={handleReady} />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // The pre-write refresh is still open.
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+
+    let settled = false;
+    const write = captured!
+      .saveTeam({ name: "Tim" } as never)
+      .then(() => {
+        settled = true;
+      });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(saveTeam).toHaveBeenCalledTimes(1);
+
+    // Releasing only the pre-write request must not settle the command: that
+    // snapshot cannot contain the write.
+    await act(async () => {
+      releaseFirst();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(settled).toBe(false);
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      releaseSecond();
+      await write;
+    });
+
+    expect(settled).toBe(true);
   });
 
   it("coalesces presence churn into one refetch per interval", async () => {
