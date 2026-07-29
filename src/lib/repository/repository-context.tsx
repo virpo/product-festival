@@ -88,6 +88,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   const drainRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const snapshotDirty = useRef(false);
   const draining = useRef(false);
+  const mounted = useRef(true);
   // Counts started fetches, so a writer can tell whether the request it is
   // looking at began before or after its own write.
   const fetchStarts = useRef(0);
@@ -97,6 +98,13 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   const retryAction = useRef<() => void>(() => undefined);
   const realtimeState = useRef<"connecting" | "connected" | "disconnected">(
     "connecting",
+  );
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
   );
 
   useEffect(() => {
@@ -239,7 +247,9 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     await refreshWithRecovery();
   }, [refreshWithRecovery]);
 
-  // Keep fetching while changes keep arriving mid-fetch, one at a time.
+  // Keep fetching while changes keep arriving mid-fetch, one at a time, at the
+  // pace the invalidation path already uses. Writes do not come through here:
+  // `refreshAfterWrite` stays immediate.
   const drainDirty = useCallback(async () => {
     if (draining.current) {
       return;
@@ -247,11 +257,32 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     draining.current = true;
     try {
       while (snapshotDirty.current) {
+        // Share the throttle with `invalidate`. Without this, a snapshot slow
+        // enough to overlap the next event lets every fetch be dirtied and
+        // immediately followed by another, which is sustained traffic rather
+        // than one refetch per interval.
+        const wait =
+          INVALIDATION_MIN_INTERVAL_MS -
+          (Date.now() - lastInvalidationRefresh.current);
+        if (wait > 0) {
+          await new Promise((resolve) => {
+            window.setTimeout(resolve, wait);
+          });
+          if (!mounted.current) {
+            return;
+          }
+        }
+
         snapshotDirty.current = false;
+        lastInvalidationRefresh.current = Date.now();
+
         try {
           await recoverRef.current();
         } catch {
-          // Recovery owns the connection state and the backoff.
+          // Recovery already scheduled a backoff retry, and that retry performs
+          // a full snapshot which covers this change. Looping here would refetch
+          // immediately and defeat the pacing during an outage.
+          return;
         }
       }
     } finally {

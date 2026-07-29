@@ -171,7 +171,9 @@ describe("FestivalProvider retry recovery", () => {
 
     await act(async () => {
       releaseFirst();
-      await vi.advanceTimersByTimeAsync(0);
+      // The follow-up shares the invalidation throttle, so it lands one
+      // interval later rather than immediately.
+      await vi.advanceTimersByTimeAsync(3_100);
     });
 
     // The invalidation must produce a fetch that starts after it, rather than
@@ -244,7 +246,7 @@ describe("FestivalProvider retry recovery", () => {
 
     await act(async () => {
       releaseFirst();
-      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(3_100);
     });
 
     // A stale snapshot must never be advertised as live just because the first
@@ -522,7 +524,8 @@ describe("FestivalProvider retry recovery", () => {
       invalidate();
       await vi.advanceTimersByTimeAsync(50);
       releases[0]();
-      await vi.advanceTimersByTimeAsync(0);
+      // The drain shares the invalidation throttle before starting its fetch.
+      await vi.advanceTimersByTimeAsync(3_100);
     });
 
     expect(getSnapshot).toHaveBeenCalledTimes(2);
@@ -555,6 +558,85 @@ describe("FestivalProvider retry recovery", () => {
     });
 
     expect(settled).toBe(true);
+  });
+
+  it("paces drain follow-ups when invalidations keep arriving mid-fetch", async () => {
+    const snapshot = createDemoSnapshot();
+    const pending: Array<() => void> = [];
+    // Every snapshot is slow, so the next invalidation always lands while a
+    // request is in flight — the ordering that drives the drain rather than the
+    // throttle timer.
+    const getSnapshot = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(() => resolve(snapshot));
+        }),
+    );
+
+    let invalidate: () => void = () => undefined;
+    const subscribe = vi.fn(
+      (
+        listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        invalidate = listener;
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi.fn().mockResolvedValue(null),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence: vi.fn(),
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam: vi.fn(),
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <Probe />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Ten cycles of "invalidate during the fetch, then let the fetch finish",
+    // all inside a single throttle interval.
+    await act(async () => {
+      for (let index = 0; index < 10; index += 1) {
+        invalidate();
+        pending.shift()?.();
+        await vi.advanceTimersByTimeAsync(100);
+      }
+    });
+
+    // Paced by INVALIDATION_MIN_INTERVAL_MS (3s), not one fetch per event.
+    expect(getSnapshot.mock.calls.length).toBeLessThanOrEqual(3);
+
+    // The last invalidation must still be observed once the interval elapses.
+    const beforeSettle = getSnapshot.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_500);
+      pending.shift()?.();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(getSnapshot.mock.calls.length).toBeGreaterThan(beforeSettle);
   });
 
   it("coalesces presence churn into one refetch per interval", async () => {
