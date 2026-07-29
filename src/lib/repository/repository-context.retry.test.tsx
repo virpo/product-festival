@@ -84,13 +84,153 @@ describe("FestivalProvider retry recovery", () => {
     expect(screen.getByText("retrying")).toBeInTheDocument();
     expect(screen.getByText("Network unavailable")).toBeInTheDocument();
 
+    // Reconnect delays carry jitter, so advance past the top of the envelope.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(2_500);
     });
 
     expect(screen.getByText("ready")).toBeInTheDocument();
     expect(screen.getByText("live")).toBeInTheDocument();
     expect(screen.queryByText("Network unavailable")).not.toBeInTheDocument();
     expect(getSnapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it("refetches when an invalidation arrives during an in-flight refresh", async () => {
+    const snapshot = createDemoSnapshot();
+    let releaseFirst: () => void = () => undefined;
+    const getSnapshot = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = () => resolve(snapshot);
+          }),
+      )
+      .mockResolvedValue(snapshot);
+
+    let invalidate: () => void = () => undefined;
+    const subscribe = vi.fn(
+      (
+        listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        invalidate = listener;
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi.fn().mockResolvedValue(null),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence: vi.fn(),
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam: vi.fn(),
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <Probe />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // The first snapshot is still in flight and must not be duplicated.
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+
+    // Realtime reports a change those queries may have read past.
+    await act(async () => {
+      invalidate();
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      releaseFirst();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // The invalidation must produce a fetch that starts after it, rather than
+    // being coalesced into the request that was already running.
+    expect(getSnapshot).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("ready")).toBeInTheDocument();
+  });
+
+  it("coalesces presence churn into one refetch per interval", async () => {
+    const snapshot = createDemoSnapshot();
+    const getSnapshot = vi.fn().mockResolvedValue(snapshot);
+
+    let invalidate: () => void = () => undefined;
+    const subscribe = vi.fn(
+      (
+        listener: () => void,
+        connectionListener?: (status: "connected" | "disconnected") => void,
+      ) => {
+        invalidate = listener;
+        connectionListener?.("connected");
+        return vi.fn();
+      },
+    );
+
+    repositoryState.current = {
+      mode: "supabase",
+      getSnapshot,
+      getCurrentPerson: vi.fn().mockResolvedValue(null),
+      subscribe,
+      claimPerson: vi.fn(),
+      signOut: vi.fn(),
+      touchPresence: vi.fn(),
+      markVisit: vi.fn(),
+      upsertSignal: vi.fn(),
+      removeSignal: vi.fn(),
+      saveTeam: vi.fn(),
+      removeTeam: vi.fn(),
+      savePerson: vi.fn(),
+      removePerson: vi.fn(),
+      updateEvent: vi.fn(),
+      advanceEvent: vi.fn(),
+      resetDemo: vi.fn(),
+    } as unknown as FestivalRepository;
+
+    render(
+      <FestivalProvider>
+        <Probe />
+      </FestivalProvider>,
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const afterInitialLoad = getSnapshot.mock.calls.length;
+
+    // One heartbeat per participant, spread across the throttle window.
+    await act(async () => {
+      for (let index = 0; index < 40; index += 1) {
+        invalidate();
+        await vi.advanceTimersByTimeAsync(60);
+      }
+    });
+
+    // Without throttling each heartbeat would cost a full snapshot.
+    expect(getSnapshot.mock.calls.length - afterInitialLoad).toBeLessThanOrEqual(
+      2,
+    );
   });
 });

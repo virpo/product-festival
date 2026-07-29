@@ -64,6 +64,14 @@ type FestivalContextValue = {
 
 export const FestivalContext = createContext<FestivalContextValue | null>(null);
 
+const INVALIDATION_DEBOUNCE_MS = 50;
+const INVALIDATION_MIN_INTERVAL_MS = 3_000;
+// Realtime can stay nominally connected yet miss a notification. An unattended
+// projector wall has no presence heartbeat and no user interaction, so without a
+// slow safety refetch it can show the wrong phase for the rest of the evening.
+const SAFETY_POLL_MS = 60_000;
+const SAFETY_POLL_JITTER_MS = 15_000;
+
 export function FestivalProvider({ children }: { children: ReactNode }) {
   const [repository, setRepository] =
     useState<FestivalRepository | null>(null);
@@ -76,6 +84,10 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     stale: false,
   });
   const refreshInFlight = useRef<Promise<void> | null>(null);
+  const refreshQueued = useRef<Promise<void> | null>(null);
+  const refreshRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const snapshotDirty = useRef(false);
+  const lastInvalidationRefresh = useRef(0);
   const retryTimer = useRef<number | null>(null);
   const retryAttempt = useRef(0);
   const retryAction = useRef<() => void>(() => undefined);
@@ -99,6 +111,8 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       return refreshInFlight.current;
     }
 
+    snapshotDirty.current = false;
+
     const request = (async () => {
       const [nextSnapshot, nextPerson] = await Promise.all([
         repository.getSnapshot(),
@@ -121,11 +135,26 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         if (refreshInFlight.current === request) {
           refreshInFlight.current = null;
         }
+        // An invalidation landed while these queries were running, so they may
+        // have read the database before that change committed. Coalescing it
+        // into this request would leave the snapshot permanently behind, so run
+        // exactly one follow-up fetch.
+        if (snapshotDirty.current && !refreshQueued.current) {
+          snapshotDirty.current = false;
+          refreshQueued.current = Promise.resolve().then(() => {
+            refreshQueued.current = null;
+            return refreshRef.current().catch(() => undefined);
+          });
+        }
       });
 
     refreshInFlight.current = request;
     return request;
   }, [repository]);
+
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
 
   const clearRetryTimer = useCallback(() => {
     if (retryTimer.current !== null) {
@@ -206,17 +235,33 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     let active = true;
     let invalidationTimer: number | null = null;
     const invalidate = () => {
+      // Record that the database moved even if the refetch is still throttled,
+      // so an in-flight refresh cannot swallow this change.
+      snapshotDirty.current = true;
+
       if (!active || invalidationTimer !== null) {
         return;
       }
+
+      // Presence heartbeats write `people`, which this event publishes through
+      // Realtime, so an organizer device receives one invalidation per
+      // participant every two minutes and each one costs a full snapshot
+      // (~10 requests). Cap invalidation-driven refetches instead of tracking
+      // every heartbeat; the trailing refetch keeps the data fresh.
+      const sinceLast = Date.now() - lastInvalidationRefresh.current;
+      const wait = Math.max(
+        INVALIDATION_DEBOUNCE_MS,
+        INVALIDATION_MIN_INTERVAL_MS - sinceLast,
+      );
 
       invalidationTimer = window.setTimeout(() => {
         invalidationTimer = null;
         if (!active) {
           return;
         }
+        lastInvalidationRefresh.current = Date.now();
         void refreshWithRecovery().catch(() => undefined);
-      }, 50);
+      }, wait);
     };
     const handleConnection = (status: "connected" | "disconnected") => {
       if (!active) {
@@ -243,14 +288,36 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("online", handleOnline);
 
+    // A phone that slept through a change reports no disconnect, so refetch as
+    // soon as the screen comes back.
+    const handleVisibility = () => {
+      if (!active || document.visibilityState !== "visible") {
+        return;
+      }
+      void retryNow().catch(() => undefined);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const safetyPoll = window.setInterval(
+      () => {
+        if (!active) {
+          return;
+        }
+        void refreshWithRecovery().catch(() => undefined);
+      },
+      SAFETY_POLL_MS + Math.floor(Math.random() * SAFETY_POLL_JITTER_MS),
+    );
+
     return () => {
       active = false;
       window.clearTimeout(initialLoad);
       if (invalidationTimer !== null) {
         window.clearTimeout(invalidationTimer);
       }
+      window.clearInterval(safetyPoll);
       clearRetryTimer();
       window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibility);
       unsubscribe();
     };
   }, [
