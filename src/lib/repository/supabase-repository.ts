@@ -34,6 +34,8 @@ type RepositoryOptions = {
 type Row = Record<string, unknown>;
 
 export const AUDIO_URL_TTL_SECONDS = 6 * 60 * 60;
+// Re-sign a little before expiry so a cached link cannot go stale mid-playback.
+const SIGNED_URL_REFRESH_MARGIN_MS = 5 * 60 * 1_000;
 
 // The reliability RPCs signal every rejected invariant as a bare PL/pgSQL
 // identifier. Without this map the organizer sees `membership_locked_after_signal`
@@ -254,17 +256,39 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     return mapEvent(data);
   }
 
+  // Signed links last six hours, so re-signing every recording on every snapshot
+  // is pure waste: an organizer device refreshes on invalidations and on the
+  // safety poll, and the cost grows with every recording in the event.
+  private readonly signedAudioUrls = new Map<
+    string,
+    { url: string; expiresAt: number }
+  >();
+
   private async withSignedAudio(signals: Signal[]): Promise<Signal[]> {
+    const now = Date.now();
+
     return Promise.all(
       signals.map(async (signal) => {
         if (!signal.audioPath) return signal;
+
+        const cached = this.signedAudioUrls.get(signal.audioPath);
+        if (cached && cached.expiresAt > now) {
+          return { ...signal, audioUrl: cached.url };
+        }
+
         const { data, error } = await this.client.storage
           .from("festival-feedback")
           .createSignedUrl(signal.audioPath, AUDIO_URL_TTL_SECONDS);
-        return {
-          ...signal,
-          audioUrl: error ? null : data.signedUrl,
-        };
+        if (error) {
+          return { ...signal, audioUrl: null };
+        }
+
+        this.signedAudioUrls.set(signal.audioPath, {
+          url: data.signedUrl,
+          expiresAt:
+            now + AUDIO_URL_TTL_SECONDS * 1_000 - SIGNED_URL_REFRESH_MARGIN_MS,
+        });
+        return { ...signal, audioUrl: data.signedUrl };
       }),
     );
   }
