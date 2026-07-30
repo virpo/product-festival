@@ -2482,6 +2482,275 @@ button {
   height: 42px;
 }
 
+.participant-frame {
+  min-height: calc(100dvh - 65px);
+  display: flex;
+  flex-direction: column;
+}
+
+.participant-frame__content {
+  min-height: 0;
+  flex: 1;
+}
+
+.participant-overview {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  padding: 28px 0 12px;
+}
+
+.overview-balance {
+  display: grid;
+  gap: 5px;
+}
+
+.overview-balance > strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(4.25rem, 16vw, 6rem);
+  font-weight: 650;
+  line-height: 0.96;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-balance > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 550;
+}
+
+.participant-overview > .progress-meter {
+  min-height: 0;
+  margin-top: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.participant-overview .progress-label > strong {
+  color: var(--muted-strong);
+  font-family: var(--font-body), sans-serif;
+  font-size: 0.86rem;
+}
+
+.participant-overview .progress-track {
+  height: 7px;
+  margin-top: 11px;
+}
+
+.overview-result-link {
+  min-height: 68px;
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 13px;
+  padding: 0 17px;
+  border: 1px solid rgba(98, 197, 192, 0.28);
+  border-radius: 18px;
+  background: rgba(98, 197, 192, 0.07);
+}
+
+.overview-result-link > svg:first-child {
+  color: var(--cyan);
+}
+
+.overview-result-link small,
+.overview-result-link strong {
+  display: block;
+}
+
+.overview-result-link small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.overview-result-link strong {
+  margin-top: 4px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+}
+
+.overview-investments {
+  margin-top: 26px;
+}
+
+.overview-investments > header {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.overview-investments h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.overview-investments > header > span {
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  color: var(--cyan);
+  background: rgba(98, 197, 192, 0.1);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.overview-investment {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto 30px;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.overview-investment:hover {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.overview-team-mark {
+  width: 6px;
+  height: 36px;
+  border-radius: 99px;
+}
+
+.overview-investment-copy {
+  min-width: 0;
+}
+
+.overview-investment-copy strong,
+.overview-investment-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-investment-copy strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.94rem;
+}
+
+.overview-investment-copy small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.overview-investment > b {
+  color: var(--cyan);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-investment > svg {
+  justify-self: end;
+  color: var(--muted);
+}
+
+.overview-empty {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+
+.overview-signout {
+  min-height: 38px;
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.72rem;
+}
+
+.overview-dock {
+  width: min(680px, 100%);
+  margin: 0 auto;
+}
+
+.overview-primary-action {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 22px;
+  border-radius: 22px;
+  color: #071817;
+  background: var(--cyan);
+  box-shadow: 0 18px 42px -20px rgba(98, 197, 192, 0.72);
+}
+
+.overview-primary-action small,
+.overview-primary-action strong {
+  display: block;
+}
+
+.overview-primary-action small {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+
+.overview-primary-action strong {
+  margin-top: 5px;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: -0.035em;
+}
+
+.festival-snackbar {
+  position: fixed;
+  right: 50%;
+  bottom: calc(108px + env(safe-area-inset-bottom));
+  z-index: 70;
+  width: min(440px, calc(100% - 32px));
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border: 1px solid rgba(101, 214, 173, 0.3);
+  border-radius: 15px;
+  color: var(--ink);
+  background: #1a2420;
+  box-shadow: 0 24px 70px -24px rgba(0, 0, 0, 0.9);
+  font-size: 0.82rem;
+  font-weight: 650;
+  transform: translateX(50%);
+  animation: snackbarIn 180ms ease-out;
+}
+
+.festival-snackbar > svg {
+  flex: 0 0 auto;
+  color: var(--success);
+}
+
+@keyframes snackbarIn {
+  from {
+    opacity: 0;
+    transform: translate(50%, 8px);
+  }
+}
+
 @keyframes wallPulse {
   0%,
   100% {
@@ -2508,6 +2777,39 @@ button {
 
   .app-header {
     min-height: 64px;
+  }
+
+  .festival-header__inner {
+    width: min(100% - 24px, 1180px);
+  }
+
+  .festival-header__identity {
+    max-width: 36vw;
+    font-size: 0.61rem;
+    letter-spacing: 0.1em;
+  }
+
+  .festival-header__back > span {
+    max-width: 26vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-demo-pill {
+    display: none;
+  }
+
+  .participant-overview {
+    padding-top: 24px;
+  }
+
+  .overview-balance > strong {
+    font-size: clamp(4.1rem, 20vw, 5.2rem);
+  }
+
+  .participant-dock {
+    padding-top: 13px;
   }
 
   .brand-lockup {

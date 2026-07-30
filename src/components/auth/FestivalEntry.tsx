@@ -5,10 +5,14 @@ import { ArrowRight, LogOut, Settings2 } from "lucide-react";
 import { AppShell } from "@/components/brand/AppShell";
 import { ParticipantHome } from "@/components/participant/ParticipantHome";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
+import { formatCredits } from "@/lib/domain/credits";
 import { useFestival } from "@/lib/repository/useFestival";
+import { useRouter, useSearchParams } from "next/navigation";
 import { JoinScreen } from "./JoinScreen";
 
 export function FestivalEntry() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     commands,
     currentPerson,
@@ -40,6 +44,31 @@ export function FestivalEntry() {
     );
   }
 
+  const savedCode = searchParams.get("saved")?.toUpperCase() ?? null;
+  const removedCode = searchParams.get("removed")?.toUpperCase() ?? null;
+  const savedTeam = snapshot.teams.find(
+    (team) => team.code.toUpperCase() === savedCode,
+  );
+  const removedTeam = snapshot.teams.find(
+    (team) => team.code.toUpperCase() === removedCode,
+  );
+  const savedSignal = savedTeam
+    ? snapshot.signals.find(
+        (signal) =>
+          signal.investorId === currentPerson.id &&
+          signal.teamId === savedTeam.id,
+      )
+    : null;
+  const notice =
+    savedTeam && savedSignal
+      ? `Uložené pre ${savedTeam.name} · ${formatCredits(
+          savedSignal.amount,
+          snapshot.event.currency,
+        )}`
+      : removedTeam
+        ? `Investícia pre ${removedTeam.name} odstránená`
+        : null;
+
   return (
     <AppShell mode={mode}>
       {currentPerson.role === "organizer" ? (
@@ -70,18 +99,14 @@ export function FestivalEntry() {
           </section>
         </main>
       ) : (
-        <>
-          <ParticipantHome person={currentPerson} snapshot={snapshot} />
-          <div className="participant-signout">
-            <button
-              className="text-button"
-              onClick={() => void commands.signOut()}
-              type="button"
-            >
-              <LogOut aria-hidden="true" size={17} /> Odhlásiť sa
-            </button>
-          </div>
-        </>
+        <ParticipantHome
+          mode={mode}
+          notice={notice}
+          onDismissNotice={() => router.replace("/", { scroll: false })}
+          onSignOut={commands.signOut}
+          person={currentPerson}
+          snapshot={snapshot}
+        />
       )}
     </AppShell>
   );

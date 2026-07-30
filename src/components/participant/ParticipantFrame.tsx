@@ -78,8 +78,10 @@ export function ParticipantFrame({
 
   return (
     <AppShell header={<FestivalHeader left={left} right={right} />} mode={mode}>
-      {children}
-      {bottom}
+      <div className="participant-frame">
+        <div className="participant-frame__content">{children}</div>
+        {bottom}
+      </div>
     </AppShell>
   );
 }

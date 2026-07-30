@@ -1,6 +1,12 @@
 import type { Coverage } from "@/lib/domain/types";
 
-export function ProgressMeter({ coverage }: { coverage: Coverage }) {
+export function ProgressMeter({
+  compact = false,
+  coverage,
+}: {
+  compact?: boolean;
+  coverage: Coverage;
+}) {
   return (
     <div className="progress-meter">
       <div className="progress-label">
@@ -19,10 +25,12 @@ export function ProgressMeter({ coverage }: { coverage: Coverage }) {
       >
         <span style={{ width: `${coverage.percent}%` }} />
       </div>
-      <p>
-        Skús aspoň {coverage.target}. Čím viac produktov chytíš do ruky, tým
-        lepší bude tvoj signál.
-      </p>
+      {!compact ? (
+        <p>
+          Skús aspoň {coverage.target}. Čím viac produktov chytíš do ruky, tým
+          lepší bude tvoj signál.
+        </p>
+      ) : null}
     </div>
   );
 }
