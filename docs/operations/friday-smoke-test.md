@@ -1,7 +1,21 @@
 # Friday smoke test
 
-Run this after the database migration and frontend deployment, before people
-enter the room.
+Run this before people enter the room.
+
+## Deploy order
+
+The frontend degrades quietly if it runs ahead of the schema: missing
+`event_stats` columns map to zero, so the wall hides its progress bar and falls
+back to the legacy invested total instead of reporting an error.
+
+- [ ] Apply `202607300001_investment_progress.sql` and
+  `202607310001_wallet_covers_signals.sql` **before** deploying the frontend.
+- [ ] Watch the `202607310001` output for `wallet below committed signals`
+  notices. Each one names a person whose credit was already lowered below what
+  they invested; fix those wallets in **Ľudia** before opening.
+- [ ] Confirm the event currency reads `🥞` and not `$`. The migration only
+  rewrites the bootstrap value, and only where that migration has not already
+  been applied.
 
 ## Setup
 
@@ -31,17 +45,28 @@ enter the room.
   investment.
 - [ ] Scan a foreign team. The product screen opens and the wall visit count
   updates without a manual reload.
-- [ ] Send written feedback with an exact amount. The portfolio, wallet and
-  aggregate wall update.
-- [ ] Edit the amount and feedback in the portfolio. There is still one signal
-  for that team.
-- [ ] Record audio feedback for another team and save it.
+- [ ] Send written feedback with an exact amount. The overview shows the new
+  investment with a confirmation, and the wallet and aggregate wall update.
+- [ ] Open that investment again from the overview row, change the amount and
+  save. There is still one signal for that team.
+- [ ] Record audio feedback for another team and save it. While recording, the
+  save and delete actions stay disabled until you stop.
+- [ ] Re-record over an existing recording, then delete it. The recorder shows
+  no recording and the saved signal keeps none either.
+- [ ] The wall's progress bar rises as credits are distributed and only reads
+  100% once nothing is left. The invested figure agrees with the bar.
+- [ ] In **Ľudia**, try lowering a participant's credit below what they have
+  already invested. It is rejected with a readable message.
 
 ## Connection recovery
 
 - [ ] Turn the phone offline. The last snapshot stays visible with a compact
   stale-data warning and **Obnoviť** action.
 - [ ] Restore connectivity. The warning clears and fresh room data appears.
+- [ ] Repeat while editing an investment on `/t/<code>` at 390×844. The warning
+  sits above the dock and does not cover **Uložiť zmeny** or the delete action.
+- [ ] Save an investment while offline. The confirmation is readable and is not
+  hidden behind the stale-data warning.
 - [ ] Repeat on `/wall`: the warning is clearly visible from the room, but does
   not cover the main numbers.
 
