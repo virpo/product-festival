@@ -5,6 +5,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 type RecorderState = "idle" | "requesting" | "recording" | "recorded" | "error";
 
+// Browsers report codec-qualified types such as `audio/webm;codecs=opus`, but
+// the festival-feedback bucket allows exact base types only, and Supabase
+// Storage compares the full subtype. Upload the base type or the recording is
+// rejected after the participant has already made it.
+export function baseMimeType(value: string | undefined): string {
+  const base = (value ?? "").split(";")[0].trim().toLowerCase();
+  return base || "audio/webm";
+}
+
 type AudioRecorderProps = {
   existingUrl?: string | null;
   value?: Blob | null;
@@ -86,7 +95,7 @@ export function AudioRecorder({
       });
       recorder.addEventListener("stop", () => {
         const blob = new Blob(chunksRef.current, {
-          type: recorder.mimeType || "audio/webm",
+          type: baseMimeType(recorder.mimeType),
         });
         stream.getTracks().forEach((track) => track.stop());
         onChange(blob);
