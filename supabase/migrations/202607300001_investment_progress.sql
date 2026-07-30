@@ -124,9 +124,13 @@ begin
       from budget
     ),
     (
+      -- Floor below completion so the public wall cannot show a full bar
+      -- while credits are still left. Mirrors deriveEventStats in
+      -- src/lib/domain/stats.ts.
       select case
         when total = 0 then 0
-        else least(100, round(100.0 * distributed / total)::integer)
+        when distributed >= total then 100
+        else floor(100.0 * distributed / total)::integer
       end
       from budget
     ),
