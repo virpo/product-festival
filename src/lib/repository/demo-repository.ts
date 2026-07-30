@@ -220,10 +220,22 @@ export class DemoFestivalRepository implements FestivalRepository {
     );
 
     if (existing) {
-      Object.assign(existing, normalized, {
-        audioUrl: audio ? URL.createObjectURL(audio) : existing.audioUrl,
-        updatedAt: now,
-      });
+      const previousUrl = existing.audioUrl;
+      // Follow the path, not the presence of a new blob. Keeping the old URL
+      // when `audioPath` is cleared leaves a removed recording playable on the
+      // released receipt, which renders from `audioUrl` alone. The Supabase
+      // adapter deletes the stored object in the same situation.
+      const audioUrl = audio
+        ? URL.createObjectURL(audio)
+        : normalized.audioPath
+          ? previousUrl
+          : null;
+
+      if (previousUrl && previousUrl !== audioUrl && previousUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previousUrl);
+      }
+
+      Object.assign(existing, normalized, { audioUrl, updatedAt: now });
       this.write(snapshot);
       return structuredClone(existing);
     }

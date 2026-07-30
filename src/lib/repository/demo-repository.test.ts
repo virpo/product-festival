@@ -185,6 +185,43 @@ describe("DemoFestivalRepository", () => {
     expect((await repo.getSnapshot()).event.resultsReleasedAt).not.toBeNull();
   });
 
+  it("clears the audio url when a recording is removed", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+
+    const withAudio = await repo.upsertSignal(
+      {
+        investorId: person.id,
+        teamId: team.id,
+        amount: 5,
+        feedbackText: "",
+        audioPath: "pending-recording",
+      },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+    expect(withAudio.audioUrl).toBeTruthy();
+
+    const removed = await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 5,
+      feedbackText: "Written instead.",
+      audioPath: null,
+    });
+
+    expect(removed.audioPath).toBeNull();
+    expect(removed.audioUrl).toBeNull();
+  });
+
   it("re-derives stats for a snapshot stored by an earlier release", async () => {
     const storage = memoryStorage();
     const seeded = await new DemoFestivalRepository(storage).getSnapshot();
