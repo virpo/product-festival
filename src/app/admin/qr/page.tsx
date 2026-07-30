@@ -39,14 +39,13 @@ export default function AdminQrPage() {
   return (
     <AppShell
       header={
-        <div className="no-print">
-          <OrganizerHeader
-            back={{ href: "/admin", label: "Administrácia" }}
-            eventStatus={snapshot.event.status}
-            name={currentPerson.name}
-            onSignOut={commands.signOut}
-          />
-        </div>
+        <OrganizerHeader
+          back={{ href: "/admin", label: "Administrácia" }}
+          className="no-print"
+          eventStatus={snapshot.event.status}
+          name={currentPerson.name}
+          onSignOut={commands.signOut}
+        />
       }
       mode={mode}
     >

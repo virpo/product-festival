@@ -35,4 +35,21 @@ describe("OrganizerHeader", () => {
     ).toHaveAttribute("href", "/admin");
     expect(screen.getByLabelText("Product Festival")).toBeInTheDocument();
   });
+
+  it("puts a print class on the sticky header itself, not a wrapper", () => {
+    const { container } = render(
+      <OrganizerHeader
+        className="no-print"
+        eventStatus="open"
+        name="Peter"
+        onSignOut={vi.fn()}
+      />,
+    );
+
+    // A wrapper element would become the sticky header's containing block and
+    // stop it from travelling with the page on /admin/qr.
+    const header = container.querySelector("header");
+    expect(header).toHaveClass("festival-header", "no-print");
+    expect(container.firstElementChild).toBe(header);
+  });
 });
