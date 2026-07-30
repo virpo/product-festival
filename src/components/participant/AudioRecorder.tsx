@@ -105,11 +105,11 @@ export function AudioRecorder({
   }
 
   function remove() {
-    if (value) {
-      onChange(null);
-    } else if (existingUrl) {
-      onRemoveExisting?.();
-    }
+    // Clear both the pending blob and any retained server recording. Branching
+    // here would leave a re-recorded clip's original still attached to the
+    // signal while the recorder shows an empty state.
+    onChange(null);
+    onRemoveExisting?.();
     setSeconds(0);
     setState("idle");
   }

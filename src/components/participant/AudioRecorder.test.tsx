@@ -27,6 +27,26 @@ describe("AudioRecorder", () => {
     );
 
     expect(onRemoveExisting).toHaveBeenCalledOnce();
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it("clears the retained recording when a re-recorded clip is deleted", () => {
+    const onChange = vi.fn();
+    const onRemoveExisting = vi.fn();
+    render(
+      <AudioRecorder
+        existingUrl="https://example.com/feedback.webm"
+        onChange={onChange}
+        onRemoveExisting={onRemoveExisting}
+        value={new Blob(["fresh"], { type: "audio/webm" })}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Odstrániť nahrávku" }),
+    );
+
+    expect(onChange).toHaveBeenCalledWith(null);
+    expect(onRemoveExisting).toHaveBeenCalledOnce();
   });
 });
