@@ -231,12 +231,20 @@ export class DemoFestivalRepository implements FestivalRepository {
           ? previousUrl
           : null;
 
-      if (previousUrl && previousUrl !== audioUrl && previousUrl.startsWith("blob:")) {
+      Object.assign(existing, normalized, { audioUrl, updatedAt: now });
+      this.write(snapshot);
+
+      // Revoke only after the snapshot is persisted. `write()` can throw on a
+      // full storage quota, and revoking first would leave the retained
+      // recording referenced but no longer playable.
+      if (
+        previousUrl &&
+        previousUrl !== audioUrl &&
+        previousUrl.startsWith("blob:")
+      ) {
         URL.revokeObjectURL(previousUrl);
       }
 
-      Object.assign(existing, normalized, { audioUrl, updatedAt: now });
-      this.write(snapshot);
       return structuredClone(existing);
     }
 
