@@ -674,15 +674,26 @@ button {
 }
 
 /*
-  Participant screens carry a sticky dock at bottom 0 holding the primary
-  action (scan, save, delete). The notice is fixed with z-index 100 against the
-  dock's 30, so at the default 16px offset the connection warning sits on top of
-  those controls and swallows taps — exactly when the connection is already bad.
-  Clear the tallest dock (16px padding + 72px action + safe area) using the same
-  offset the save snackbar already uses. The wall variant keeps its own.
+  Participant screens carry a sticky dock at bottom 0 holding the primary action
+  (scan, save, delete). The notice is fixed with z-index 100 against the dock's
+  30, so at the default 16px offset it sits on top of those controls and
+  swallows taps — exactly when the connection is already bad.
+
+  The offset has to clear two things, not one:
+
+  1. The TALLEST dock, which is the signal-form edit dock, not the overview:
+     13px dock padding-top (<=640px) + 58px save row + 7px delete margin
+     + 40px delete row = 118px above the safe area.
+  2. The save snackbar, which occupies 108px..160px above the safe area and has
+     the LOWER z-index. A failed post-write refresh renders both at once — the
+     write succeeds, the redirect shows the confirmation, and the failed refresh
+     raises the notice — so colocating them would hide the confirmation in the
+     one case it was built for.
+
+  160px + a 12px gap = 172px. The wall variant keeps its own offset.
 */
 .connection-notice--app {
-  bottom: calc(108px + env(safe-area-inset-bottom));
+  bottom: calc(172px + env(safe-area-inset-bottom));
 }
 
 .connection-notice--wall {
