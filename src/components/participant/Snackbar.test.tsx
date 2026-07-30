@@ -28,4 +28,23 @@ describe("Snackbar", () => {
 
     expect(onDismiss).toHaveBeenCalledOnce();
   });
+
+  it("dismisses on time while the parent keeps re-rendering", () => {
+    vi.useFakeTimers();
+    const onDismiss = vi.fn();
+    const message = "Uložené pre Ledger Lens · 17🥞";
+    const { rerender } = render(
+      <Snackbar message={message} onDismiss={() => onDismiss()} />,
+    );
+
+    // A realtime invalidation lands every 3s and hands down a new callback.
+    for (let tick = 0; tick < 3; tick += 1) {
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      rerender(<Snackbar message={message} onDismiss={() => onDismiss()} />);
+    }
+
+    expect(onDismiss).toHaveBeenCalledOnce();
+  });
 });
