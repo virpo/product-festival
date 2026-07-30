@@ -15,7 +15,10 @@ export function Snackbar({
   // event. Keying the timeout on the callback identity would restart it each
   // time and the snackbar would never dismiss.
   const dismissRef = useRef(onDismiss);
-  dismissRef.current = onDismiss;
+
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => dismissRef.current(), 4_000);
