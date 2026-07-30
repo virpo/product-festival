@@ -3388,8 +3388,13 @@ button {
     margin-top: -58px;
   }
 
+  /*
+    `.signal-form` is deliberately excluded: the redesigned form sets
+    `padding: 0` and owns its spacing through `.signal-form__body`, so adding
+    28px back here reintroduced 42px of combined top padding and worked against
+    the one-viewport phone layout.
+  */
   .scanner-page,
-  .signal-form,
   .portfolio-page {
     padding-top: 28px;
   }

@@ -84,6 +84,17 @@ export class DemoFestivalRepository implements FestivalRepository {
         // an anonymous wall never writes, so nothing would ever recompute
         // them. Deriving on read keeps stored data authoritative for wallets
         // and signals only.
+        // Demo recordings are held as object URLs, which die with the document
+        // that created them. A restored snapshot therefore carries `blob:`
+        // URLs that resolve to nothing; keeping them would render dead audio
+        // controls on the receipt. Dropping them leaves `audioPath` set, which
+        // the recorder and receipt both present as "attached but unplayable".
+        for (const signal of snapshot.signals) {
+          if (signal.audioUrl?.startsWith("blob:")) {
+            signal.audioUrl = null;
+          }
+        }
+
         snapshot.stats = deriveEventStats(snapshot);
         return snapshot;
       } catch {

@@ -67,9 +67,14 @@ export function FestivalEntry() {
   // laxer check would render "· 0🥞" for `?amount=` and defeat the fallback
   // this exists for. Zero itself is a legal amount and stays accepted.
   const savedAmountParam = searchParams.get("amount");
-  const savedAmount =
+  const parsedAmount =
     savedAmountParam && /^\d+$/.test(savedAmountParam)
       ? Number(savedAmountParam)
+      : Number.NaN;
+  const savedAmount =
+    Number.isSafeInteger(parsedAmount) &&
+    parsedAmount <= snapshot.event.maxPerTeam
+      ? parsedAmount
       : (savedSignal?.amount ?? null);
   const notice = savedTeam
     ? savedAmount === null

@@ -82,6 +82,31 @@ describe("FestivalEntry", () => {
     expect(screen.getByText(`Uložené pre ${team.name}`)).toBeInTheDocument();
   });
 
+  it("ignores an amount that is impossible for this event", () => {
+    const snapshot = mocks.festival.current.snapshot as ReturnType<
+      typeof createDemoSnapshot
+    >;
+    const team = snapshot.teams[0];
+    snapshot.signals = snapshot.signals.filter(
+      (signal) =>
+        !(signal.investorId === "person-peter" && signal.teamId === team.id),
+    );
+    // A digit-only string can still exceed Number.MAX_SAFE_INTEGER (rendering
+    // "Infinity🥞") or simply exceed the per-team maximum.
+    mocks.searchParams.current = { saved: team.code, amount: "9".repeat(309) };
+
+    const { unmount } = render(<FestivalEntry />);
+    expect(screen.getByText(`Uložené pre ${team.name}`)).toBeInTheDocument();
+    unmount();
+
+    mocks.searchParams.current = {
+      saved: team.code,
+      amount: String(snapshot.event.maxPerTeam + 1),
+    };
+    render(<FestivalEntry />);
+    expect(screen.getByText(`Uložené pre ${team.name}`)).toBeInTheDocument();
+  });
+
   it("still confirms the save when the amount is missing from the URL", () => {
     const snapshot = mocks.festival.current.snapshot as ReturnType<
       typeof createDemoSnapshot
