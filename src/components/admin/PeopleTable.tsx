@@ -18,8 +18,8 @@ type PeopleCommands = {
 const roles: { value: PersonRole; label: string }[] = [
   { value: "participant", label: "Účastník" },
   { value: "mentor", label: "Mentor" },
-  { value: "organizer", label: "Organizátor" },
-  { value: "observer", label: "Hosť" },
+  { value: "observer", label: "Organizátor bez admina" },
+  { value: "organizer", label: "Admin" },
 ];
 
 export function PeopleTable({

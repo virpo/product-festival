@@ -15,8 +15,8 @@ import type { ReactNode } from "react";
 const roleLabels: Record<PersonRole, string> = {
   participant: "účastník",
   mentor: "mentor",
-  organizer: "organizátor",
-  observer: "hosť",
+  organizer: "admin",
+  observer: "organizátor",
 };
 
 const statusLabels: Record<EventStatus, string> = {

@@ -5,8 +5,8 @@ import { AudioLines, MessageSquareText, WalletCards } from "lucide-react";
 const roleLabel = {
   participant: "účastník",
   mentor: "mentor",
-  organizer: "organizátor",
-  observer: "hosť",
+  organizer: "admin",
+  observer: "organizátor",
 } as const;
 
 export function TeamReceipt({

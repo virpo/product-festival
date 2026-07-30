@@ -32,6 +32,24 @@ describe("ParticipantFrame", () => {
     expect(screen.getByText("Marek · mentor")).toBeInTheDocument();
   });
 
+  it("labels non-admin organizer voters as organizers", () => {
+    render(
+      <ParticipantFrame
+        person={{
+          ...participant,
+          id: "person-organizer-voter",
+          name: "Marek Suppa",
+          role: "observer",
+        }}
+        snapshot={snapshot}
+      >
+        <p>Organizátorský obsah</p>
+      </ParticipantFrame>,
+    );
+
+    expect(screen.getByText("Marek Suppa · organizátor")).toBeInTheDocument();
+  });
+
   it("renders a useful back destination on task screens", () => {
     render(
       <ParticipantFrame
