@@ -1,10 +1,10 @@
 "use client";
 
 import { AppShell } from "@/components/brand/AppShell";
+import { ParticipantFrame } from "@/components/participant/ParticipantFrame";
 import { QrScanner } from "@/components/participant/QrScanner";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function ScanPage() {
@@ -34,11 +34,13 @@ export default function ScanPage() {
   }
 
   return (
-    <AppShell mode={mode}>
-      <Link className="back-link" href="/">
-        <ArrowLeft aria-hidden="true" size={17} /> Domov
-      </Link>
+    <ParticipantFrame
+      back={{ href: "/", label: "Prehľad" }}
+      mode={mode}
+      person={currentPerson}
+      snapshot={snapshot}
+    >
       <QrScanner />
-    </AppShell>
+    </ParticipantFrame>
   );
 }

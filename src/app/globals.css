@@ -2493,6 +2493,91 @@ button {
   flex: 1;
 }
 
+.scanner-flow {
+  min-height: calc(100dvh - 65px);
+  display: flex;
+  flex-direction: column;
+}
+
+.scanner-flow .scanner-page {
+  width: min(680px, 100%);
+  flex: 1;
+  padding: 22px 0 0;
+}
+
+.scanner-flow .scanner-heading h1 {
+  margin-top: 6px;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.scanner-flow .scanner-card {
+  margin-top: 16px;
+  padding: 8px;
+  border-radius: 22px;
+}
+
+.scanner-flow .scanner-viewport,
+.scanner-flow #festival-qr-reader,
+.scanner-flow #festival-qr-reader video {
+  height: clamp(300px, calc(100dvh - 275px), 520px);
+  min-height: 0;
+}
+
+.scanner-flow .scanner-viewport {
+  border-radius: 16px;
+}
+
+.scanner-error {
+  margin-top: 11px;
+}
+
+.scanner-dock {
+  width: min(680px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.scanner-back {
+  min-height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.scanner-manual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54px;
+  gap: 8px;
+}
+
+.scanner-manual .field-input {
+  min-width: 0;
+  height: 58px;
+  padding: 0 16px;
+  border-radius: 18px;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.scanner-manual button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 17px;
+  color: #071817;
+  background: var(--cyan);
+}
+
 .participant-overview {
   width: min(680px, 100%);
   margin: 0 auto;
