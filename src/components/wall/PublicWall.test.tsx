@@ -32,6 +32,25 @@ describe("PublicWall", () => {
     expect(screen.queryByText(/rebríček|poradie/i)).not.toBeInTheDocument();
   });
 
+  it("reports invested credits from the same pool as the progress bar", () => {
+    const snapshot = createDemoSnapshot(new Date("2026-07-24T10:00:00Z"));
+    // An organizer can invest, and those credits count toward totalInvested but
+    // not toward the budget the bar describes.
+    const stats = {
+      ...snapshot.stats!,
+      budgetTotal: 1000,
+      budgetDistributed: 420,
+      budgetRemaining: 580,
+      budgetDistributedPercent: 42,
+      totalInvested: 520,
+    };
+
+    render(<PublicWall event={snapshot.event} stats={stats} />);
+
+    expect(screen.getByText("420🥞")).toBeInTheDocument();
+    expect(screen.queryByText("520🥞")).not.toBeInTheDocument();
+  });
+
   it("hides budget progress when the stats row carries no budget total", () => {
     const snapshot = createDemoSnapshot(new Date("2026-07-24T10:00:00Z"));
     // A frontend running against the pre-migration `event_stats` shape maps

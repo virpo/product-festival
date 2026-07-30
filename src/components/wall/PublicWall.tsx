@@ -89,7 +89,16 @@ export function PublicWall({
         </article>
         <article>
           <WalletCards aria-hidden="true" />
-          <strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong>
+          {/*
+            Use the same non-organizer pool as the progress bar above. Organizer
+            signals count toward `totalInvested` but not toward the budget, so
+            mixing them on one screen can show more invested than the bar and
+            the "zostáva" figure account for. `totalInvested` keeps its
+            all-signal meaning for its organizer-facing consumers.
+          */}
+          <strong>
+            {formatCredits(stats?.budgetDistributed ?? 0, event.currency)}
+          </strong>
           <span>investovaných</span>
         </article>
       </section>
