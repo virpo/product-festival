@@ -24,6 +24,8 @@ type AudioRecorderProps = {
   hasExisting?: boolean;
   value?: Blob | null;
   onChange(value: Blob | null): void;
+  /** Reports whether the microphone is being requested or is recording. */
+  onBusyChange?(busy: boolean): void;
   onRemoveExisting?(): void;
 };
 
@@ -32,6 +34,7 @@ export function AudioRecorder({
   hasExisting = false,
   value = null,
   onChange,
+  onBusyChange,
   onRemoveExisting,
 }: AudioRecorderProps) {
   const hasRecording = Boolean(value) || Boolean(existingUrl) || hasExisting;
@@ -49,6 +52,17 @@ export function AudioRecorder({
     [value],
   );
   const audioUrl = objectUrl ?? existingUrl;
+
+  // Held in a ref so a parent passing a fresh callback each render cannot
+  // retrigger the effect below.
+  const busyRef = useRef(onBusyChange);
+  useEffect(() => {
+    busyRef.current = onBusyChange;
+  }, [onBusyChange]);
+
+  useEffect(() => {
+    busyRef.current?.(state === "requesting" || state === "recording");
+  }, [state]);
 
   useEffect(() => {
     if (state !== "recording") {

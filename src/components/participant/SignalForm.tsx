@@ -61,6 +61,10 @@ export function SignalForm({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // The recorded Blob only reaches this form from the recorder's later `stop`
+  // event, so saving mid-recording would persist the previous audio path and
+  // throw the recording away when navigation unmounts the recorder.
+  const [recorderBusy, setRecorderBusy] = useState(false);
 
   function setSafeAmount(value: number) {
     setAmount(Math.max(0, Math.min(maximum, Number.isFinite(value) ? value : 0)));
@@ -69,6 +73,11 @@ export function SignalForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+
+    if (recorderBusy) {
+      setError("Najprv zastav nahrávanie.");
+      return;
+    }
 
     if (!feedback.trim() && !audio && !keepExistingAudio) {
       setError("Pridaj feedback alebo hlasovú poznámku.");
@@ -160,6 +169,7 @@ export function SignalForm({
               keepExistingAudio ? existingSignal?.audioUrl ?? null : null
             }
             hasExisting={keepExistingAudio}
+            onBusyChange={setRecorderBusy}
             onChange={setAudio}
             onRemoveExisting={() => setKeepExistingAudio(false)}
             value={audio}
@@ -258,7 +268,7 @@ export function SignalForm({
             </Link>
             <button
               className="signal-save"
-              disabled={saving || deleting}
+              disabled={saving || deleting || recorderBusy}
               type="submit"
             >
               {saving
@@ -272,7 +282,7 @@ export function SignalForm({
           {existingSignal && onDelete ? (
             <button
               className="signal-delete"
-              disabled={saving || deleting}
+              disabled={saving || deleting || recorderBusy}
               onClick={() => void remove()}
               type="button"
             >
