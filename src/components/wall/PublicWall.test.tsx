@@ -31,4 +31,26 @@ describe("PublicWall", () => {
     expect(screen.queryByText("QueueLess")).not.toBeInTheDocument();
     expect(screen.queryByText(/rebríček|poradie/i)).not.toBeInTheDocument();
   });
+
+  it("hides budget progress when the stats row carries no budget total", () => {
+    const snapshot = createDemoSnapshot(new Date("2026-07-24T10:00:00Z"));
+    // A frontend running against the pre-migration `event_stats` shape maps
+    // every missing budget column to zero.
+    const stats = {
+      ...snapshot.stats!,
+      budgetTotal: 0,
+      budgetDistributed: 0,
+      budgetRemaining: 0,
+      budgetDistributedPercent: 0,
+    };
+
+    render(<PublicWall event={snapshot.event} stats={stats} />);
+
+    expect(
+      screen.queryByText("Rozdelené z celého rozpočtu"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("0%")).not.toBeInTheDocument();
+    // The rest of the wall still renders.
+    expect(screen.getByText("feedbackov")).toBeInTheDocument();
+  });
 });
