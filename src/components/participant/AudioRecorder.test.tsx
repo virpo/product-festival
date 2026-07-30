@@ -61,6 +61,41 @@ describe("AudioRecorder microphone lifecycle", () => {
     expect(track.stop).toHaveBeenCalled();
   });
 
+  it("hands the parent a Blob normalized to the base MIME type", async () => {
+    const { stream } = fakeStream();
+    const { grant } = stubMedia(stream);
+    let stopListener: (() => void) | undefined;
+    vi.stubGlobal(
+      "MediaRecorder",
+      class {
+        // What Chromium actually reports for an audio-only recording.
+        mimeType = "audio/webm;codecs=opus";
+        state = "inactive";
+        addEventListener(type: string, listener: () => void) {
+          if (type === "stop") stopListener = listener;
+        }
+        start() {}
+        stop() {}
+      },
+    );
+    const onChange = vi.fn();
+
+    render(<AudioRecorder onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+    await act(async () => {
+      grant();
+    });
+
+    act(() => {
+      stopListener?.();
+    });
+
+    // Guards the call site, not just the helper: reverting the Blob to
+    // `recorder.mimeType` would send a codec-qualified type the bucket rejects.
+    expect(onChange).toHaveBeenCalledOnce();
+    expect(onChange.mock.calls[0][0].type).toBe("audio/webm");
+  });
+
   it("keeps an attached recording removable when re-recording fails", async () => {
     const { stream } = fakeStream();
     const { grant } = stubMedia(stream);
