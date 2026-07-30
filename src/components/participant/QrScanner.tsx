@@ -54,7 +54,15 @@ export function QrScanner() {
           },
           () => undefined,
         );
-        if (active) setState("ready");
+        if (!active) {
+          // Unmounted while the camera was still starting. The cleanup's
+          // stop() ran before html5-qrcode left its NOT_STARTED state and was
+          // discarded, so this is the only remaining chance to release the
+          // camera the start() call just acquired.
+          await stopAndClear(scanner);
+          return;
+        }
+        setState("ready");
       } catch {
         if (active) {
           setState("error");

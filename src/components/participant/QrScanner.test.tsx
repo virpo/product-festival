@@ -55,6 +55,34 @@ describe("QrScanner", () => {
     expect(mocks.clear).toHaveBeenCalledOnce();
   });
 
+  it("stops a camera that finishes starting after unmount", async () => {
+    let finishStarting = () => undefined;
+    mocks.start.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStarting = resolve;
+        }),
+    );
+    // html5-qrcode rejects stop() until start() has left its NOT_STARTED state.
+    mocks.stop.mockImplementationOnce(() => {
+      throw new Error("Cannot stop, scanner is not running or paused.");
+    });
+    mocks.stop.mockResolvedValue(undefined);
+
+    const { unmount } = render(<QrScanner />);
+
+    await waitFor(() => expect(mocks.start).toHaveBeenCalledOnce());
+    unmount();
+
+    await act(async () => {
+      finishStarting();
+      await Promise.resolve();
+    });
+
+    expect(mocks.stop).toHaveBeenCalledTimes(2);
+    expect(mocks.clear).toHaveBeenCalled();
+  });
+
   it("does not crash when stop throws before the camera starts", async () => {
     mocks.start.mockRejectedValueOnce(new Error("Camera unavailable"));
     mocks.stop.mockImplementationOnce(() => {
