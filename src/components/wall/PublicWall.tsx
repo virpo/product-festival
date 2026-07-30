@@ -14,7 +14,8 @@ export function PublicWall({
   stats: EventStats | null;
 }) {
   const countdown = useCountdown(event.locksAt);
-  const coverageValue = stats?.coveragePercent ?? 0;
+  const distributedPercent = stats?.budgetDistributedPercent ?? 0;
+  const remainingBudget = stats?.budgetRemaining ?? 0;
 
   return (
     <main className={`public-wall public-wall--${event.status}`} data-updated={stats?.updatedAt}>
@@ -54,11 +55,17 @@ export function PublicWall({
 
       <section className="wall-progress">
         <div>
-          <span>Ľudia, ktorí vyskúšali aspoň {event.coverageTarget}% tímov</span>
-          <strong>{coverageValue}%</strong>
+          <div className="wall-progress-copy">
+            <span>Rozdelené z celého rozpočtu</span>
+            <small>
+              <span>{formatCredits(remainingBudget, event.currency)}</span>
+              <span>zostáva</span>
+            </small>
+          </div>
+          <strong>{distributedPercent}%</strong>
         </div>
         <div className="wall-progress-track">
-          <span style={{ width: `${coverageValue}%` }} />
+          <span style={{ width: `${distributedPercent}%` }} />
         </div>
       </section>
 

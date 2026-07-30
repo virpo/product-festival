@@ -90,6 +90,10 @@ export type EventStats = {
   feedbackCount: number;
   recordingCount: number;
   totalInvested: number;
+  budgetTotal: number;
+  budgetDistributed: number;
+  budgetRemaining: number;
+  budgetDistributedPercent: number;
   coverageQualifiedPeople: number;
   coveragePercent: number;
   averageCoverage: number;

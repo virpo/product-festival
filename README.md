@@ -54,7 +54,7 @@ The organizer controls the event and watches participation in real time.
 - exact investment amounts with `+` / `−` controls;
 - written or microphone-recorded feedback;
 - wallet, progress and editable investments in one participant overview;
-- projector wall with countdown, coverage and aggregate activity;
+- projector wall with countdown, distributed-budget progress and aggregate activity;
 - organizer controls for `draft → open → locked → released`;
 - private team receipts after release;
 - Supabase Auth, Postgres, Realtime, Storage and RLS;

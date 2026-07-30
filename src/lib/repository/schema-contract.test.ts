@@ -16,6 +16,10 @@ const reliabilityMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607290001_festival_reliability.sql",
 );
+const investmentProgressMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607300001_investment_progress.sql",
+);
 
 describe("Supabase schema contract", () => {
   it("defines protected tables and aggregate realtime state", () => {
@@ -119,5 +123,21 @@ describe("Supabase schema contract", () => {
         `alter publication supabase_realtime add table public.${table}`,
       );
     }
+  });
+
+  it("publishes wallet distribution toward one hundred percent", () => {
+    const sql = readFileSync(
+      investmentProgressMigrationPath,
+      "utf8",
+    ).toLowerCase();
+
+    expect(sql).toContain("budget_total");
+    expect(sql).toContain("budget_distributed");
+    expect(sql).toContain("budget_remaining");
+    expect(sql).toContain("budget_distributed_percent");
+    expect(sql).toContain("p.role <> 'organizer'");
+    expect(sql).toContain("greatest(");
+    expect(sql).toContain("least(100");
+    expect(sql).toContain("refresh_event_stats");
   });
 });

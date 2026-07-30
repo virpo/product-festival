@@ -210,6 +210,12 @@ function mapStats(value: unknown): EventStats | null {
     feedbackCount: numberValue(row.feedback_count),
     recordingCount: numberValue(row.recording_count),
     totalInvested: numberValue(row.total_invested),
+    budgetTotal: numberValue(row.budget_total),
+    budgetDistributed: numberValue(row.budget_distributed),
+    budgetRemaining: numberValue(row.budget_remaining),
+    budgetDistributedPercent: numberValue(
+      row.budget_distributed_percent,
+    ),
     coverageQualifiedPeople: numberValue(row.coverage_qualified_people),
     coveragePercent: numberValue(row.coverage_percent),
     averageCoverage: numberValue(row.average_coverage),

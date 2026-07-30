@@ -78,4 +78,57 @@ describe("festival stats", () => {
     });
     expect(stats).not.toHaveProperty("teamTotals");
   });
+
+  it("tracks how much of the non-organizer budget has been distributed", () => {
+    const snapshot = makeSnapshot({
+      people: [
+        ...makeSnapshot().people,
+        {
+          id: "person-admin",
+          eventId: "event-1",
+          name: "Organizátor",
+          role: "organizer",
+          walletBudget: 100,
+          accessCode: "ADMIN",
+          authUserId: null,
+          lastSeenAt: now,
+          createdAt: now,
+        },
+      ],
+      signals: [
+        {
+          id: "signal-mentor",
+          eventId: "event-1",
+          investorId: "person-2",
+          teamId: "team-1",
+          amount: 50,
+          feedbackText: "Keep going.",
+          audioPath: null,
+          audioUrl: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: "signal-organizer",
+          eventId: "event-1",
+          investorId: "person-admin",
+          teamId: "team-1",
+          amount: 50,
+          feedbackText: "This must not move the public progress.",
+          audioPath: null,
+          audioUrl: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+    });
+
+    expect(deriveEventStats(snapshot, new Date(now))).toMatchObject({
+      budgetTotal: 200,
+      budgetDistributed: 50,
+      budgetRemaining: 150,
+      budgetDistributedPercent: 25,
+      totalInvested: 100,
+    });
+  });
 });

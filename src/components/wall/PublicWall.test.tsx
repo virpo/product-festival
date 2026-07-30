@@ -10,6 +10,9 @@ describe("PublicWall", () => {
       ...snapshot.stats!,
       feedbackCount: 64,
       totalInvested: 420,
+      budgetDistributed: 420,
+      budgetRemaining: 580,
+      budgetDistributedPercent: 42,
     };
 
     render(<PublicWall event={snapshot.event} stats={stats} />);
@@ -18,6 +21,13 @@ describe("PublicWall", () => {
     expect(screen.getByText("feedbackov")).toBeInTheDocument();
     expect(screen.getByText("420🥞")).toBeInTheDocument();
     expect(screen.queryByText("🥞420")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Rozdelené z celého rozpočtu"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("42%")).toBeInTheDocument();
+    expect(screen.getByText("580🥞")).toBeInTheDocument();
+    expect(screen.getByText("zostáva")).toBeInTheDocument();
+    expect(screen.queryByText(/75% tímov/i)).not.toBeInTheDocument();
     expect(screen.queryByText("QueueLess")).not.toBeInTheDocument();
     expect(screen.queryByText(/rebríček|poradie/i)).not.toBeInTheDocument();
   });
