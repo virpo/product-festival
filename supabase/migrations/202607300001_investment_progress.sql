@@ -179,6 +179,17 @@ begin
 end;
 $$;
 
+-- The bootstrap migration created the AI Build Week event with '$' before the
+-- pancake default existed, and both seeds insert with `on conflict do nothing`,
+-- so neither can change the row that production already has. Move only the
+-- known bootstrap value so an organizer's own choice is never overwritten.
+-- '🥞' is the single code point U+1F95E, so it passes the 1-3 character
+-- validation in update_event_settings.
+update public.events
+set currency = '🥞'
+where slug = 'ai-build-week'
+  and currency = '$';
+
 do $$
 declare
   event_row record;

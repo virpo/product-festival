@@ -137,7 +137,23 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("budget_distributed_percent");
     expect(sql).toContain("p.role <> 'organizer'");
     expect(sql).toContain("greatest(");
-    expect(sql).toContain("least(100");
+    // 100% must mean the budget is gone, so the percentage floors below
+    // completion instead of rounding up to a full bar. Mirrors
+    // deriveEventStats in src/lib/domain/stats.ts.
+    expect(sql).toContain("when distributed >= total then 100");
+    expect(sql).toContain("floor(100.0 * distributed / total)");
+    expect(sql).not.toContain("round(100.0 * distributed / total)");
     expect(sql).toContain("refresh_event_stats");
+  });
+
+  it("moves the bootstrapped event onto the pancake currency", () => {
+    const sql = readFileSync(investmentProgressMigrationPath, "utf8");
+
+    // Both seeds insert with `on conflict do nothing`, so only a forward
+    // migration can change the currency the bootstrap migration already wrote.
+    expect(sql).toContain("update public.events");
+    expect(sql).toContain("set currency = '🥞'");
+    expect(sql).toContain("where slug = 'ai-build-week'");
+    expect(sql).toContain("and currency = '$'");
   });
 });
