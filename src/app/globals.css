@@ -673,6 +673,18 @@ button {
   font-size: 0.76rem;
 }
 
+/*
+  Participant screens carry a sticky dock at bottom 0 holding the primary
+  action (scan, save, delete). The notice is fixed with z-index 100 against the
+  dock's 30, so at the default 16px offset the connection warning sits on top of
+  those controls and swallows taps — exactly when the connection is already bad.
+  Clear the tallest dock (16px padding + 72px action + safe area) using the same
+  offset the save snackbar already uses. The wall variant keeps its own.
+*/
+.connection-notice--app {
+  bottom: calc(108px + env(safe-area-inset-bottom));
+}
+
 .connection-notice--wall {
   right: clamp(20px, 3vw, 48px);
   bottom: clamp(20px, 3vw, 48px);
@@ -3311,7 +3323,6 @@ button {
 
   .connection-notice {
     right: 12px;
-    bottom: 12px;
     max-width: calc(100vw - 24px);
     grid-template-columns: auto minmax(0, 1fr);
   }
