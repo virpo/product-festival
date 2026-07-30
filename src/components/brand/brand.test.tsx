@@ -13,4 +13,15 @@ describe("AppShell", () => {
     expect(screen.getByText("Demo dáta")).toBeInTheDocument();
     expect(screen.getByText("Content")).toBeInTheDocument();
   });
+
+  it("accepts a route-specific header", () => {
+    render(
+      <AppShell header={<div>Vlastná hlavička</div>}>
+        <p>Content</p>
+      </AppShell>,
+    );
+
+    expect(screen.getByText("Vlastná hlavička")).toBeInTheDocument();
+    expect(screen.queryByText("Product Festival")).not.toBeInTheDocument();
+  });
 });

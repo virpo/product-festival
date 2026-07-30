@@ -96,6 +96,124 @@ button {
   border-bottom: 1px solid var(--line);
 }
 
+.festival-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 11, 13, 0.9);
+  backdrop-filter: blur(16px);
+}
+
+.festival-header__inner {
+  width: min(1180px, calc(100% - 32px));
+  min-height: 64px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.festival-header__left {
+  min-width: 0;
+  justify-self: start;
+}
+
+.festival-header__brand {
+  grid-column: 2;
+  display: grid;
+  place-items: center;
+}
+
+.festival-header__right {
+  min-width: 0;
+  justify-self: end;
+}
+
+.festival-header__identity {
+  display: block;
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.festival-header__back {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.festival-header__status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.header-balance,
+.header-event-state,
+.header-demo-pill {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 99px;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.header-balance {
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+
+.header-event-state {
+  padding: 0 11px;
+  border: 1px solid rgba(245, 167, 32, 0.36);
+  color: var(--amber);
+  background: rgba(245, 167, 32, 0.1);
+  font-size: 0.64rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.header-event-state--released {
+  border-color: rgba(98, 197, 192, 0.34);
+  color: var(--cyan);
+  background: rgba(98, 197, 192, 0.09);
+}
+
+.header-demo-pill {
+  min-height: 24px;
+  padding: 0 7px;
+  color: var(--amber);
+  background: rgba(245, 167, 32, 0.08);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.participant-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  padding: 16px 0 max(18px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 72%, rgba(11, 11, 13, 0));
+}
+
 .brand-lockup {
   display: inline-flex;
   align-items: center;
