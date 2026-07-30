@@ -196,7 +196,12 @@ export default function TeamPage() {
 
   async function save(input: SignalInput, audio?: Blob | null) {
     await commands.upsertSignal(input, audio);
-    router.push(`/?saved=${encodeURIComponent(teamCode)}`);
+    // Carry the amount that was just written. The post-write refresh is
+    // allowed to fail, so the overview cannot rely on the snapshot already
+    // holding this signal.
+    router.push(
+      `/?saved=${encodeURIComponent(teamCode)}&amount=${input.amount}`,
+    );
   }
 
   async function remove() {
