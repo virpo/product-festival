@@ -65,6 +65,23 @@ describe("FestivalEntry", () => {
     ).toBeInTheDocument();
   });
 
+  it("ignores an unusable amount parameter instead of rendering it", () => {
+    const snapshot = mocks.festival.current.snapshot as ReturnType<
+      typeof createDemoSnapshot
+    >;
+    const team = snapshot.teams[0];
+    snapshot.signals = snapshot.signals.filter(
+      (signal) =>
+        !(signal.investorId === "person-peter" && signal.teamId === team.id),
+    );
+    // Number("") is 0, so a lax guard would confirm "· 0🥞".
+    mocks.searchParams.current = { saved: team.code, amount: "" };
+
+    render(<FestivalEntry />);
+
+    expect(screen.getByText(`Uložené pre ${team.name}`)).toBeInTheDocument();
+  });
+
   it("still confirms the save when the amount is missing from the URL", () => {
     const snapshot = mocks.festival.current.snapshot as ReturnType<
       typeof createDemoSnapshot

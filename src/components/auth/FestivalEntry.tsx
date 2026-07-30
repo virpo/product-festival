@@ -63,11 +63,13 @@ export function FestivalEntry() {
   // post-write refresh fails. Falling back to the snapshot alone would drop the
   // confirmation entirely on a first save, or show the pre-edit amount on an
   // edit, exactly when the connection is worst.
+  // Only a plain non-negative integer is trusted. `Number("")` is 0, so a
+  // laxer check would render "· 0🥞" for `?amount=` and defeat the fallback
+  // this exists for. Zero itself is a legal amount and stays accepted.
   const savedAmountParam = searchParams.get("amount");
-  const parsedSavedAmount = Number(savedAmountParam);
   const savedAmount =
-    savedAmountParam !== null && Number.isFinite(parsedSavedAmount)
-      ? parsedSavedAmount
+    savedAmountParam && /^\d+$/.test(savedAmountParam)
+      ? Number(savedAmountParam)
       : (savedSignal?.amount ?? null);
   const notice = savedTeam
     ? savedAmount === null
