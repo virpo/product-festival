@@ -2829,6 +2829,245 @@ button {
   color: var(--success);
 }
 
+.signal-form {
+  width: min(680px, 100%);
+  min-height: calc(100dvh - 65px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.signal-form__body {
+  flex: 1;
+  padding: 18px 0 8px;
+}
+
+.signal-team {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.signal-team__mark {
+  width: 6px;
+  height: 44px;
+  border-radius: 99px;
+}
+
+.signal-team h1 {
+  margin-top: 3px;
+  overflow: hidden;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(1.8rem, 7vw, 2.5rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signal-product-link {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid rgba(98, 197, 192, 0.28);
+  border-radius: 11px;
+  color: var(--cyan);
+  background: rgba(98, 197, 192, 0.06);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.signal-feedback {
+  margin-top: 15px;
+}
+
+.audio-recorder {
+  margin-top: 9px;
+}
+
+.record-button--primary {
+  min-height: 66px;
+  justify-content: flex-start;
+  padding: 0 14px;
+  border-color: rgba(237, 59, 91, 0.34);
+  border-radius: 17px;
+  color: var(--ink);
+  background: rgba(237, 59, 91, 0.055);
+}
+
+.record-button--primary:hover {
+  border-color: rgba(237, 59, 91, 0.58);
+  background: rgba(237, 59, 91, 0.09);
+}
+
+.record-button__icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--coral);
+  box-shadow: 0 12px 28px -15px rgba(237, 59, 91, 0.9);
+}
+
+.record-button--primary strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.98rem;
+}
+
+.signal-write-label {
+  margin-top: 11px;
+  display: block;
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.signal-textarea {
+  min-height: 84px;
+  margin-top: 7px;
+  padding: 11px 13px;
+  resize: vertical;
+  font-size: 0.88rem;
+}
+
+.signal-amount {
+  margin-top: 15px;
+}
+
+.signal-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.signal-section-label > span:first-child {
+  color: var(--muted-strong);
+}
+
+.signal-amount .amount-control {
+  margin-top: 9px;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+}
+
+.signal-amount .amount-control > button {
+  min-height: 58px;
+  border-radius: 15px;
+}
+
+.signal-amount .amount-control > label {
+  min-height: 58px;
+  border-radius: 16px;
+  font-size: 1.75rem;
+}
+
+.amount-presets {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.amount-presets button {
+  min-height: 39px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.025);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.amount-presets button:hover {
+  border-color: rgba(98, 197, 192, 0.3);
+  color: var(--cyan);
+}
+
+.signal-edit-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.69rem;
+  text-align: center;
+}
+
+.signal-dock {
+  width: min(680px, 100%);
+  margin: 0 auto;
+}
+
+.signal-dock__row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.signal-back,
+.signal-save {
+  min-height: 58px;
+  border-radius: 18px;
+}
+
+.signal-back {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.signal-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 0;
+  color: #071817;
+  background: var(--cyan);
+  box-shadow: 0 18px 42px -22px rgba(98, 197, 192, 0.78);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.signal-save:disabled,
+.signal-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.signal-delete {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(237, 59, 91, 0.28);
+  border-radius: 13px;
+  color: var(--danger);
+  background: rgba(237, 59, 91, 0.025);
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
 @keyframes snackbarIn {
   from {
     opacity: 0;
@@ -2895,6 +3134,50 @@ button {
 
   .participant-dock {
     padding-top: 13px;
+  }
+
+  .signal-form__body {
+    padding-top: 14px;
+  }
+
+  .signal-team {
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+
+  .signal-team h1 {
+    font-size: clamp(1.65rem, 8vw, 2.15rem);
+  }
+
+  .signal-product-link {
+    width: 38px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .signal-feedback {
+    margin-top: 12px;
+  }
+
+  .record-button--primary {
+    min-height: 62px;
+  }
+
+  .signal-textarea {
+    min-height: 78px;
+  }
+
+  .signal-amount {
+    margin-top: 12px;
+  }
+
+  .amount-presets {
+    gap: 6px;
+  }
+
+  .amount-presets button {
+    min-height: 37px;
   }
 
   .brand-lockup {

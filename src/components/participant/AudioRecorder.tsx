@@ -1,42 +1,49 @@
 "use client";
 
-import { Mic, Pause, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Mic, Pause, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type RecorderState = "idle" | "requesting" | "recording" | "recorded" | "error";
 
 type AudioRecorderProps = {
+  existingUrl?: string | null;
   value?: Blob | null;
-  onChange: (value: Blob | null) => void;
+  onChange(value: Blob | null): void;
+  onRemoveExisting?(): void;
 };
 
-export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
-  const [state, setState] = useState<RecorderState>(value ? "recorded" : "idle");
+export function AudioRecorder({
+  existingUrl = null,
+  value = null,
+  onChange,
+  onRemoveExisting,
+}: AudioRecorderProps) {
+  const [state, setState] = useState<RecorderState>(
+    value || existingUrl ? "recorded" : "idle",
+  );
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const audioUrl = useMemo(
+  const objectUrl = useMemo(
     () => (value ? URL.createObjectURL(value) : null),
     [value],
   );
+  const audioUrl = objectUrl ?? existingUrl;
 
   useEffect(() => {
     if (state !== "recording") {
       return;
     }
 
-    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    const timer = window.setInterval(() => setSeconds((current) => current + 1), 1000);
     return () => window.clearInterval(timer);
   }, [state]);
 
   useEffect(
     () => () => {
-      if (
-        recorderRef.current &&
-        recorderRef.current.state !== "inactive"
-      ) {
+      if (recorderRef.current && recorderRef.current.state !== "inactive") {
         recorderRef.current.stop();
       }
       streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -45,12 +52,12 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
   );
 
   useEffect(() => {
-    if (!audioUrl) {
+    if (!objectUrl) {
       return;
     }
 
-    return () => URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [objectUrl]);
 
   async function start() {
     if (
@@ -58,7 +65,7 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
       !navigator.mediaDevices?.getUserMedia
     ) {
       setState("error");
-      setError("Nahrávanie v tomto prehliadači nefunguje. Feedback môžeš napísať.");
+      setError("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
       return;
     }
 
@@ -98,7 +105,11 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
   }
 
   function remove() {
-    onChange(null);
+    if (value) {
+      onChange(null);
+    } else if (existingUrl) {
+      onRemoveExisting?.();
+    }
     setSeconds(0);
     setState("idle");
   }
@@ -106,25 +117,39 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
   return (
     <div className="audio-recorder">
       {state === "recording" ? (
-        <button className="record-button is-recording" onClick={stop} type="button">
-          <Pause aria-hidden="true" size={18} />
-          Zastaviť · {seconds}s
+        <button
+          aria-label="Zastaviť nahrávanie"
+          className="record-button is-recording"
+          onClick={stop}
+          type="button"
+        >
+          <Pause aria-hidden="true" size={24} />
+          <span>Zastaviť · {seconds}s</span>
         </button>
       ) : state === "recorded" && audioUrl ? (
         <div className="recorded-audio">
           <audio controls src={audioUrl}>
             <track kind="captions" />
           </audio>
-          <button aria-label="Nahrať znova" onClick={() => void start()} type="button">
-            <RotateCcw aria-hidden="true" size={17} />
+          <button
+            aria-label="Nahrať znova"
+            onClick={() => void start()}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={18} />
           </button>
-          <button aria-label="Odstrániť nahrávku" onClick={remove} type="button">
-            <Trash2 aria-hidden="true" size={17} />
+          <button
+            aria-label="Odstrániť nahrávku"
+            onClick={remove}
+            type="button"
+          >
+            <Trash2 aria-hidden="true" size={18} />
           </button>
         </div>
       ) : (
         <button
-          className="record-button"
+          aria-label="Nahrať feedback"
+          className="record-button record-button--primary"
           disabled={state === "requesting"}
           onClick={() => void start()}
           type="button"
@@ -132,15 +157,16 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
           {state === "requesting" ? (
             <span className="tiny-spinner" />
           ) : (
-            <Mic aria-hidden="true" size={18} />
+            <span className="record-button__icon">
+              <Mic aria-hidden="true" size={28} />
+            </span>
           )}
-          {state === "requesting" ? "Zapínam mikrofón…" : "Nahrať feedback"}
+          <strong>
+            {state === "requesting" ? "Zapínam mikrofón…" : "Nahrať feedback"}
+          </strong>
         </button>
       )}
       {error ? <p className="field-note field-note--error">{error}</p> : null}
-      <span className="sr-only">
-        <Play aria-hidden="true" /> Hlasový feedback
-      </span>
     </div>
   );
 }
