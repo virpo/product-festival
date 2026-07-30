@@ -21,6 +21,13 @@ export function PublicWall({
   // Showing "0% · 0 zostáva" on the projector would read as real progress in
   // both cases, so show nothing instead.
   const hasBudget = (stats?.budgetTotal ?? 0) > 0;
+  // With a budget, report the same non-organizer pool as the bar above. Without
+  // one — a pre-migration row, where every budget column maps to zero — fall
+  // back to `totalInvested`, which that schema does populate, rather than
+  // stating on the projector that nothing has been invested.
+  const investedCredits = hasBudget
+    ? (stats?.budgetDistributed ?? 0)
+    : (stats?.totalInvested ?? 0);
 
   return (
     <main className={`public-wall public-wall--${event.status}`} data-updated={stats?.updatedAt}>
@@ -89,16 +96,7 @@ export function PublicWall({
         </article>
         <article>
           <WalletCards aria-hidden="true" />
-          {/*
-            Use the same non-organizer pool as the progress bar above. Organizer
-            signals count toward `totalInvested` but not toward the budget, so
-            mixing them on one screen can show more invested than the bar and
-            the "zostáva" figure account for. `totalInvested` keeps its
-            all-signal meaning for its organizer-facing consumers.
-          */}
-          <strong>
-            {formatCredits(stats?.budgetDistributed ?? 0, event.currency)}
-          </strong>
+          <strong>{formatCredits(investedCredits, event.currency)}</strong>
           <span>investovaných</span>
         </article>
       </section>

@@ -1,3 +1,4 @@
+import { formatCredits } from "@/lib/domain/credits";
 import { createDemoSnapshot } from "@/lib/repository/demo-data";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -61,6 +62,7 @@ describe("PublicWall", () => {
       budgetDistributed: 0,
       budgetRemaining: 0,
       budgetDistributedPercent: 0,
+      totalInvested: 640,
     };
 
     render(<PublicWall event={snapshot.event} stats={stats} />);
@@ -71,5 +73,11 @@ describe("PublicWall", () => {
     expect(screen.queryByText("0%")).not.toBeInTheDocument();
     // The rest of the wall still renders.
     expect(screen.getByText("feedbackov")).toBeInTheDocument();
+    // And the invested tile must not claim zero: the pre-migration schema
+    // populates total_invested even though every budget column is missing.
+    expect(
+      screen.getByText(formatCredits(stats.totalInvested, snapshot.event.currency)),
+    ).toBeInTheDocument();
+    expect(stats.totalInvested).toBeGreaterThan(0);
   });
 });
