@@ -7,7 +7,7 @@ values (
   'AI Build Week Product Festival',
   'ai-build-week',
   'open',
-  '€',
+  '🥞',
   100,
   50,
   75,
