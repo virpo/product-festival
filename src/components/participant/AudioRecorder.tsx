@@ -35,6 +35,7 @@ export function AudioRecorder({
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const mountedRef = useRef(true);
   const objectUrl = useMemo(
     () => (value ? URL.createObjectURL(value) : null),
     [value],
@@ -50,15 +51,23 @@ export function AudioRecorder({
     return () => window.clearInterval(timer);
   }, [state]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
         recorderRef.current.stop();
       }
       streamRef.current?.getTracks().forEach((track) => track.stop());
-    },
-    [],
-  );
+      streamRef.current = null;
+    };
+  }, []);
+
+  function releaseStream() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
 
   useEffect(() => {
     if (!objectUrl) {
@@ -85,8 +94,18 @@ export function AudioRecorder({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Retain the stream before anything else can throw, so every failure
+      // path below still has a handle to stop the microphone with.
       streamRef.current = stream;
+
+      // The participant can leave while the permission prompt is open; the
+      // unmount cleanup already ran and would never see this stream.
+      if (!mountedRef.current) {
+        releaseStream();
+        return;
+      }
+
+      const recorder = new MediaRecorder(stream);
       recorderRef.current = recorder;
       recorder.addEventListener("dataavailable", (event) => {
         if (event.data.size > 0) {
@@ -98,12 +117,19 @@ export function AudioRecorder({
           type: baseMimeType(recorder.mimeType),
         });
         stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) {
+          streamRef.current = null;
+        }
         onChange(blob);
         setState("recorded");
       });
       recorder.start();
       setState("recording");
     } catch {
+      releaseStream();
+      if (!mountedRef.current) {
+        return;
+      }
       setState("error");
       setError("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
     }

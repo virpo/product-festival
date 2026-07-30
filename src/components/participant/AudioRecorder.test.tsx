@@ -1,6 +1,25 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AudioRecorder, baseMimeType } from "./AudioRecorder";
+
+function fakeStream() {
+  const track = { stop: vi.fn() };
+  return { track, stream: { getTracks: () => [track] } as unknown as MediaStream };
+}
+
+function stubMedia(stream: MediaStream) {
+  let resolveStream: (value: MediaStream) => void = () => {};
+  const pending = new Promise<MediaStream>((resolve) => {
+    resolveStream = resolve;
+  });
+
+  vi.stubGlobal("navigator", {
+    ...navigator,
+    mediaDevices: { getUserMedia: vi.fn(() => pending) },
+  });
+
+  return { grant: () => resolveStream(stream) };
+}
 
 describe("baseMimeType", () => {
   it("strips codec parameters the storage bucket would reject", () => {
@@ -12,6 +31,59 @@ describe("baseMimeType", () => {
     expect(baseMimeType("audio/ogg")).toBe("audio/ogg");
     expect(baseMimeType("")).toBe("audio/webm");
     expect(baseMimeType(undefined)).toBe("audio/webm");
+  });
+});
+
+describe("AudioRecorder microphone lifecycle", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("stops the microphone when the recorder unmounts before permission lands", async () => {
+    const { track, stream } = fakeStream();
+    const { grant } = stubMedia(stream);
+    vi.stubGlobal(
+      "MediaRecorder",
+      class {
+        addEventListener() {}
+        start() {}
+      },
+    );
+
+    const { unmount } = render(<AudioRecorder onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+
+    unmount();
+    await act(async () => {
+      grant();
+    });
+
+    expect(track.stop).toHaveBeenCalled();
+  });
+
+  it("stops the microphone when the recorder cannot be constructed", async () => {
+    const { track, stream } = fakeStream();
+    const { grant } = stubMedia(stream);
+    vi.stubGlobal(
+      "MediaRecorder",
+      class {
+        constructor() {
+          throw new Error("unsupported");
+        }
+      },
+    );
+
+    render(<AudioRecorder onChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+
+    await act(async () => {
+      grant();
+    });
+
+    expect(track.stop).toHaveBeenCalled();
+    expect(
+      screen.getByText("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať."),
+    ).toBeInTheDocument();
   });
 });
 
