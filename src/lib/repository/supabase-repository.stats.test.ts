@@ -22,8 +22,14 @@ const event = {
  * event/teams/stats reads. This is the only path that exercises `mapStats`
  * against a real snake_case row.
  */
-function clientWithStats(statsRow: Record<string, unknown> | null) {
-  return {
+type RepositoryClient = ConstructorParameters<
+  typeof SupabaseFestivalRepository
+>[0];
+
+function clientWithStats(
+  statsRow: Record<string, unknown> | null,
+): RepositoryClient {
+  const client = {
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
     },
@@ -54,12 +60,13 @@ function clientWithStats(statsRow: Record<string, unknown> | null) {
       };
     }),
   };
+
+  return client as unknown as RepositoryClient;
 }
 
 describe("SupabaseFestivalRepository stats mapping", () => {
   it("maps the investment-progress columns off the wire", async () => {
     const repo = new SupabaseFestivalRepository(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       clientWithStats({
         event_id: "event-1",
         people_count: 12,
@@ -79,7 +86,7 @@ describe("SupabaseFestivalRepository stats mapping", () => {
         average_coverage: 2.5,
         role_participation: { participant: 7, mentor: 1 },
         updated_at: "2026-07-24T12:00:00Z",
-      }) as any,
+      }),
       { eventSlug: "ai-build-week" },
     );
 
@@ -97,8 +104,7 @@ describe("SupabaseFestivalRepository stats mapping", () => {
   });
 
   it("returns null stats when the row is absent", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const repo = new SupabaseFestivalRepository(clientWithStats(null) as any, {
+    const repo = new SupabaseFestivalRepository(clientWithStats(null), {
       eventSlug: "ai-build-week",
     });
 
