@@ -4,6 +4,7 @@ import {
   ACCESS_CODE_MAX_LENGTH,
   normalizeAccessCode,
 } from "@/lib/domain/access-code";
+import { formatCredits } from "@/lib/domain/credits";
 import type { FestivalSnapshot, Person, PersonRole } from "@/lib/domain/types";
 import type { SavePersonInput } from "@/lib/repository/FestivalRepository";
 import { KeyRound, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -210,7 +211,12 @@ export function PeopleTable({
                   <td><strong>{person.name}</strong></td>
                   <td>{roles.find((role) => role.value === person.role)?.label}</td>
                   <td>{team?.name ?? <span className="table-muted">—</span>}</td>
-                  <td>{snapshot.event.currency}{person.walletBudget}</td>
+                  <td>
+                    {formatCredits(
+                      person.walletBudget,
+                      snapshot.event.currency,
+                    )}
+                  </td>
                   <td><code><KeyRound aria-hidden="true" size={12} />{person.accessCode}</code></td>
                   <td>
                     <div className="row-actions">

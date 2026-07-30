@@ -190,15 +190,18 @@ export default function TeamPage() {
   const backHref = fromOverview ? "/" : "/scan";
   const headerBackLabel = fromOverview ? "Prehľad" : "Skener";
   const formBackLabel = fromOverview ? "Prehľad" : "skener";
+  const investorId = currentPerson.id;
+  const teamId = team.id;
+  const teamCode = team.code;
 
   async function save(input: SignalInput, audio?: Blob | null) {
     await commands.upsertSignal(input, audio);
-    router.push(`/?saved=${encodeURIComponent(team.code)}`);
+    router.push(`/?saved=${encodeURIComponent(teamCode)}`);
   }
 
   async function remove() {
-    await commands.removeSignal(currentPerson.id, team.id);
-    router.push(`/?removed=${encodeURIComponent(team.code)}`);
+    await commands.removeSignal(investorId, teamId);
+    router.push(`/?removed=${encodeURIComponent(teamCode)}`);
   }
 
   return (

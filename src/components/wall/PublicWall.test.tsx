@@ -16,6 +16,8 @@ describe("PublicWall", () => {
 
     expect(screen.getByText("64")).toBeInTheDocument();
     expect(screen.getByText("feedbackov")).toBeInTheDocument();
+    expect(screen.getByText("420🥞")).toBeInTheDocument();
+    expect(screen.queryByText("🥞420")).not.toBeInTheDocument();
     expect(screen.queryByText("QueueLess")).not.toBeInTheDocument();
     expect(screen.queryByText(/rebríček|poradie/i)).not.toBeInTheDocument();
   });

@@ -1,6 +1,7 @@
 "use client";
 
 import { Stripes } from "@/components/brand/Stripes";
+import { formatCredits } from "@/lib/domain/credits";
 import type { EventStats, FestivalEvent } from "@/lib/domain/types";
 import { MessageSquareText, ScanLine, WalletCards } from "lucide-react";
 import { useCountdown } from "./useCountdown";
@@ -74,7 +75,7 @@ export function PublicWall({
         </article>
         <article>
           <WalletCards aria-hidden="true" />
-          <strong>{event.currency}{stats?.totalInvested ?? 0}</strong>
+          <strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong>
           <span>investovaných</span>
         </article>
       </section>

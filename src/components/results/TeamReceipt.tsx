@@ -1,3 +1,4 @@
+import { formatCredits } from "@/lib/domain/credits";
 import type { FestivalSnapshot, Person, Team } from "@/lib/domain/types";
 import { AudioLines, MessageSquareText, WalletCards } from "lucide-react";
 
@@ -57,7 +58,7 @@ export function TeamReceipt({
         </div>
         <div className="receipt-total">
           <span>Spolu</span>
-          <strong>{snapshot.event.currency}{total}</strong>
+          <strong>{formatCredits(total, snapshot.event.currency)}</strong>
           <small>{signals.length} feedbackov</small>
         </div>
       </header>
@@ -77,7 +78,9 @@ export function TeamReceipt({
                     <strong>{author?.name ?? "Neznámy človek"}</strong>
                     <span>{author ? roleLabel[author.role] : ""}</span>
                   </div>
-                  <b>{snapshot.event.currency}{signal.amount}</b>
+                  <b>
+                    {formatCredits(signal.amount, snapshot.event.currency)}
+                  </b>
                 </div>
                 {signal.feedbackText ? (
                   <p><MessageSquareText aria-hidden="true" size={17} />{signal.feedbackText}</p>

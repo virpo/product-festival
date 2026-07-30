@@ -1,4 +1,5 @@
 import { Stripes } from "@/components/brand/Stripes";
+import { formatCredits } from "@/lib/domain/credits";
 import type { EventStats, FestivalEvent } from "@/lib/domain/types";
 
 export function PublicSummary({
@@ -17,7 +18,7 @@ export function PublicSummary({
         <article><strong>{stats?.teamCount ?? 0}</strong><span>produktov</span></article>
         <article><strong>{stats?.visitCount ?? 0}</strong><span>vyskúšaní</span></article>
         <article><strong>{stats?.feedbackCount ?? 0}</strong><span>feedbackov</span></article>
-        <article><strong>{event.currency}{stats?.totalInvested ?? 0}</strong><span>signálu</span></article>
+        <article><strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong><span>signálu</span></article>
       </section>
       <p className="summary-note">
         Investícia znamená „chcem vidieť, kam sa toto posunie“. Nie je to poradie

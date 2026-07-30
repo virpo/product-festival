@@ -9,7 +9,6 @@ import {
   LogOut,
   MessageSquareText,
   Pencil,
-  QrCode,
 } from "lucide-react";
 import Link from "next/link";
 import { ParticipantDock } from "./ParticipantDock";
