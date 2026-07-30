@@ -90,8 +90,13 @@ export function TeamReceipt({
                     <AudioLines aria-hidden="true" size={17} />
                     <audio controls src={signal.audioUrl}><track kind="captions" /></audio>
                   </div>
+                ) : signal.audioPath ? (
+                  // Signing the recording failed. Say so rather than falling
+                  // through to "investment without a note" — the team would
+                  // never learn that voice feedback exists.
+                  <p><AudioLines aria-hidden="true" size={17} />Hlasový feedback sa nepodarilo načítať. Skús obnoviť stránku.</p>
                 ) : null}
-                {!signal.feedbackText && !signal.audioUrl ? (
+                {!signal.feedbackText && !signal.audioUrl && !signal.audioPath ? (
                   <p><WalletCards aria-hidden="true" size={17} />Investícia bez textovej poznámky</p>
                 ) : null}
               </article>
