@@ -1,10 +1,10 @@
 "use client";
 
 import { QrSheet } from "@/components/admin/QrSheet";
+import { OrganizerHeader } from "@/components/admin/OrganizerHeader";
 import { AppShell } from "@/components/brand/AppShell";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 export default function AdminQrPage() {
@@ -37,10 +37,19 @@ export default function AdminQrPage() {
   }
 
   return (
-    <AppShell mode={mode}>
-      <Link className="back-link no-print" href="/admin">
-        <ArrowLeft aria-hidden="true" size={17} /> Administrácia
-      </Link>
+    <AppShell
+      header={
+        <div className="no-print">
+          <OrganizerHeader
+            back={{ href: "/admin", label: "Administrácia" }}
+            eventStatus={snapshot.event.status}
+            name={currentPerson.name}
+            onSignOut={commands.signOut}
+          />
+        </div>
+      }
+      mode={mode}
+    >
       <QrSheet
         event={snapshot.event}
         origin={origin}

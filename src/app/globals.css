@@ -3068,6 +3068,75 @@ button {
   font-weight: 650;
 }
 
+.organizer-header__section,
+.organizer-header__name {
+  color: var(--muted-strong);
+  font-family: var(--font-display), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.organizer-header__controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.organizer-header__state {
+  min-height: 29px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.61rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.organizer-header__state--open {
+  border-color: rgba(101, 214, 173, 0.35);
+  color: var(--success);
+  background: rgba(101, 214, 173, 0.08);
+}
+
+.organizer-header__state--locked {
+  border-color: rgba(245, 167, 32, 0.36);
+  color: var(--amber);
+  background: rgba(245, 167, 32, 0.08);
+}
+
+.organizer-header__state--released {
+  border-color: rgba(98, 197, 192, 0.35);
+  color: var(--cyan);
+  background: rgba(98, 197, 192, 0.08);
+}
+
+.organizer-header__signout {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.organizer-header__signout:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
 @keyframes snackbarIn {
   from {
     opacity: 0;
@@ -3178,6 +3247,16 @@ button {
 
   .amount-presets button {
     min-height: 37px;
+  }
+
+  .organizer-header__name {
+    display: none;
+  }
+
+  .organizer-header__state {
+    max-width: 31vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .brand-lockup {
