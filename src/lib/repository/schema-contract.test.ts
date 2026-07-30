@@ -20,6 +20,10 @@ const investmentProgressMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607300001_investment_progress.sql",
 );
+const walletCoversSignalsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310001_wallet_covers_signals.sql",
+);
 
 describe("Supabase schema contract", () => {
   it("defines protected tables and aggregate realtime state", () => {
@@ -144,6 +148,20 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("floor(100.0 * distributed / total)");
     expect(sql).not.toContain("round(100.0 * distributed / total)");
     expect(sql).toContain("refresh_event_stats");
+  });
+
+  it("keeps a wallet at or above the credits already committed", () => {
+    const sql = readFileSync(
+      walletCoversSignalsMigrationPath,
+      "utf8",
+    ).toLowerCase();
+
+    // save_person ships in an already-applied migration, so the invariant is
+    // enforced by a trigger that every write path passes through.
+    expect(sql).toContain("create or replace function public.enforce_wallet_covers_signals");
+    expect(sql).toContain("before update of wallet_budget on public.people");
+    expect(sql).toContain("wallet_below_committed_signals");
+    expect(sql).toContain("from public.signals");
   });
 
   it("moves the bootstrapped event onto the pancake currency", () => {

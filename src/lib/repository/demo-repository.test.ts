@@ -185,6 +185,59 @@ describe("DemoFestivalRepository", () => {
     expect((await repo.getSnapshot()).event.resultsReleasedAt).not.toBeNull();
   });
 
+  it("refuses a wallet below what the person already invested", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 40,
+      feedbackText: "Committed.",
+      audioPath: null,
+    });
+
+    const after = await repo.getSnapshot();
+    const committed = after.signals
+      .filter((signal) => signal.investorId === person.id)
+      .reduce((total, signal) => total + signal.amount, 0);
+    // Membership freezes after the first signal, so keep the current team.
+    const ownTeamId =
+      after.teamMembers.find((member) => member.personId === person.id)
+        ?.teamId ?? null;
+
+    await expect(
+      repo.savePerson({
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        walletBudget: committed - 1,
+        accessCode: person.accessCode,
+        teamId: ownTeamId,
+      }),
+    ).rejects.toThrow("Rozpočet nemôže byť nižší než už rozdelené kredity.");
+
+    // Equality is still valid: the wallet is exactly spent.
+    await expect(
+      repo.savePerson({
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        walletBudget: committed,
+        accessCode: person.accessCode,
+        teamId: ownTeamId,
+      }),
+    ).resolves.toMatchObject({ walletBudget: committed });
+  });
+
   it("clears the audio url when a recording is removed", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     const person = await repo.claimPerson("PETER");

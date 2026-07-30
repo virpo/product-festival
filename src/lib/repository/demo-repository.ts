@@ -366,6 +366,17 @@ export class DemoFestivalRepository implements FestivalRepository {
         throw new Error("Posledný organizátor musí zostať organizátorom.");
       }
 
+      // Mirrors the people_wallet_covers_signals trigger: a wallet may never
+      // drop below what the person has already invested, or the public budget
+      // progress reports more distributed than exists.
+      const committed = snapshot.signals
+        .filter((signal) => signal.investorId === existing.id)
+        .reduce((total, signal) => total + signal.amount, 0);
+
+      if (input.walletBudget < committed) {
+        throw new Error("Rozpočet nemôže byť nižší než už rozdelené kredity.");
+      }
+
       validateTeamAssignment(existing.id, input.teamId, snapshot);
       Object.assign(existing, {
         name: input.name.trim(),
