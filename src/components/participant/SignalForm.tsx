@@ -159,6 +159,7 @@ export function SignalForm({
             existingUrl={
               keepExistingAudio ? existingSignal?.audioUrl ?? null : null
             }
+            hasExisting={keepExistingAudio}
             onChange={setAudio}
             onRemoveExisting={() => setKeepExistingAudio(false)}
             value={audio}

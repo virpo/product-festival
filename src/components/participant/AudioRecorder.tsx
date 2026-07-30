@@ -16,6 +16,12 @@ export function baseMimeType(value: string | undefined): string {
 
 type AudioRecorderProps = {
   existingUrl?: string | null;
+  /**
+   * Whether a recording is attached to the saved signal. Kept separate from
+   * `existingUrl` because a signed-URL failure yields a playable-less recording
+   * that is still attached, and the participant must still be able to remove it.
+   */
+  hasExisting?: boolean;
   value?: Blob | null;
   onChange(value: Blob | null): void;
   onRemoveExisting?(): void;
@@ -23,12 +29,14 @@ type AudioRecorderProps = {
 
 export function AudioRecorder({
   existingUrl = null,
+  hasExisting = false,
   value = null,
   onChange,
   onRemoveExisting,
 }: AudioRecorderProps) {
+  const hasRecording = Boolean(value) || Boolean(existingUrl) || hasExisting;
   const [state, setState] = useState<RecorderState>(
-    value || existingUrl ? "recorded" : "idle",
+    hasRecording ? "recorded" : "idle",
   );
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
@@ -77,13 +85,20 @@ export function AudioRecorder({
     return () => URL.revokeObjectURL(objectUrl);
   }, [objectUrl]);
 
+  // A failed start must never hide a recording that is still attached to the
+  // signal: the empty error state offers no delete control, so the participant
+  // would be shown "no recording" while the old one is still submitted.
+  function failStart(message: string) {
+    setError(message);
+    setState(hasRecording ? "recorded" : "error");
+  }
+
   async function start() {
     if (
       typeof MediaRecorder === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      setState("error");
-      setError("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
+      failStart("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
       return;
     }
 
@@ -130,8 +145,7 @@ export function AudioRecorder({
       if (!mountedRef.current) {
         return;
       }
-      setState("error");
-      setError("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
+      failStart("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
     }
   }
 
@@ -161,11 +175,17 @@ export function AudioRecorder({
           <Pause aria-hidden="true" size={24} />
           <span>Zastaviť · {seconds}s</span>
         </button>
-      ) : state === "recorded" && audioUrl ? (
+      ) : state === "recorded" && hasRecording ? (
         <div className="recorded-audio">
-          <audio controls src={audioUrl}>
-            <track kind="captions" />
-          </audio>
+          {audioUrl ? (
+            <audio controls src={audioUrl}>
+              <track kind="captions" />
+            </audio>
+          ) : (
+            // Attached but not playable (for example a signed-URL failure).
+            // Still offer the controls so it can be replaced or removed.
+            <p className="field-note">Nahrávka je uložená.</p>
+          )}
           <button
             aria-label="Nahrať znova"
             onClick={() => void start()}

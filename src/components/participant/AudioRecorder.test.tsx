@@ -61,6 +61,63 @@ describe("AudioRecorder microphone lifecycle", () => {
     expect(track.stop).toHaveBeenCalled();
   });
 
+  it("keeps an attached recording removable when re-recording fails", async () => {
+    const { stream } = fakeStream();
+    const { grant } = stubMedia(stream);
+    vi.stubGlobal(
+      "MediaRecorder",
+      class {
+        constructor() {
+          throw new Error("denied");
+        }
+      },
+    );
+    const onRemoveExisting = vi.fn();
+
+    render(
+      <AudioRecorder
+        existingUrl="https://example.com/feedback.webm"
+        hasExisting
+        onChange={vi.fn()}
+        onRemoveExisting={onRemoveExisting}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať znova" }));
+    await act(async () => {
+      grant();
+    });
+
+    // The failure is reported, but the recording that is still attached to the
+    // signal must remain visible and deletable.
+    expect(
+      screen.getByText("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať."),
+    ).toBeInTheDocument();
+    const removeButton = screen.getByRole("button", {
+      name: "Odstrániť nahrávku",
+    });
+    fireEvent.click(removeButton);
+    expect(onRemoveExisting).toHaveBeenCalledOnce();
+  });
+
+  it("offers removal for an attached recording that cannot be played", () => {
+    const onRemoveExisting = vi.fn();
+    // A signed-URL failure returns audioPath without an audioUrl.
+    render(
+      <AudioRecorder
+        hasExisting
+        onChange={vi.fn()}
+        onRemoveExisting={onRemoveExisting}
+      />,
+    );
+
+    expect(screen.getByText("Nahrávka je uložená.")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Odstrániť nahrávku" }),
+    );
+    expect(onRemoveExisting).toHaveBeenCalledOnce();
+  });
+
   it("stops the microphone when the recorder cannot be constructed", async () => {
     const { track, stream } = fakeStream();
     const { grant } = stubMedia(stream);
