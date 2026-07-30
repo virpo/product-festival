@@ -184,4 +184,25 @@ describe("DemoFestivalRepository", () => {
     await repo.advanceEvent("released");
     expect((await repo.getSnapshot()).event.resultsReleasedAt).not.toBeNull();
   });
+
+  it("re-derives stats for a snapshot stored by an earlier release", async () => {
+    const storage = memoryStorage();
+    const seeded = await new DemoFestivalRepository(storage).getSnapshot();
+    // An older release persisted stats without the investment-progress fields.
+    const legacyStats = { ...seeded.stats! } as Record<string, unknown>;
+    delete legacyStats.budgetTotal;
+    delete legacyStats.budgetDistributed;
+    delete legacyStats.budgetRemaining;
+    delete legacyStats.budgetDistributedPercent;
+    storage.setItem(
+      "product-festival:demo:v1",
+      JSON.stringify({ ...seeded, stats: legacyStats }),
+    );
+
+    // A projector opens the wall anonymously and never writes.
+    const snapshot = await new DemoFestivalRepository(storage).getSnapshot();
+
+    expect(snapshot.stats?.budgetTotal).toBeGreaterThan(0);
+    expect(snapshot.stats?.budgetRemaining).toBeGreaterThan(0);
+  });
 });

@@ -78,7 +78,14 @@ export class DemoFestivalRepository implements FestivalRepository {
 
     if (stored) {
       try {
-        return JSON.parse(stored) as FestivalSnapshot;
+        const snapshot = JSON.parse(stored) as FestivalSnapshot;
+        // Stored snapshots outlive schema changes: a browser holding demo data
+        // from an earlier release carries stats without the newer fields, and
+        // an anonymous wall never writes, so nothing would ever recompute
+        // them. Deriving on read keeps stored data authoritative for wallets
+        // and signals only.
+        snapshot.stats = deriveEventStats(snapshot);
+        return snapshot;
       } catch {
         this.storage.removeItem(SNAPSHOT_KEY);
       }
