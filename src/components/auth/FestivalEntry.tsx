@@ -69,45 +69,47 @@ export function FestivalEntry() {
         ? `Investícia pre ${removedTeam.name} odstránená`
         : null;
 
+  if (currentPerson.role !== "organizer") {
+    return (
+      <ParticipantHome
+        mode={mode}
+        notice={notice}
+        onDismissNotice={() => router.replace("/", { scroll: false })}
+        onSignOut={commands.signOut}
+        person={currentPerson}
+        snapshot={snapshot}
+      />
+    );
+  }
+
   return (
     <AppShell mode={mode}>
-      {currentPerson.role === "organizer" ? (
-        <main className="home-layout">
-          <section>
-            <p className="eyebrow">{snapshot.event.name}</p>
-            <h1>Ahoj, {currentPerson.name}.</h1>
-            <p className="lede">
-              Festival je {snapshot.event.status === "open" ? "otvorený" : "zatvorený"}.
-            </p>
-          </section>
-          <section className="home-actions">
-            <Link className="primary-button" href="/admin">
-              <Settings2 aria-hidden="true" size={20} />
-              Riadenie festivalu
-              <ArrowRight aria-hidden="true" size={18} />
-            </Link>
-            <Link className="secondary-button" href="/wall">Otvoriť verejnú stenu</Link>
-            <button
-              className="text-button"
-              onClick={() => void commands.signOut()}
-              type="button"
-            >
-              <LogOut aria-hidden="true" size={17} />
-              Odhlásiť sa
-            </button>
-            {error ? <p className="form-error" role="alert">{error}</p> : null}
-          </section>
-        </main>
-      ) : (
-        <ParticipantHome
-          mode={mode}
-          notice={notice}
-          onDismissNotice={() => router.replace("/", { scroll: false })}
-          onSignOut={commands.signOut}
-          person={currentPerson}
-          snapshot={snapshot}
-        />
-      )}
+      <main className="home-layout">
+        <section>
+          <p className="eyebrow">{snapshot.event.name}</p>
+          <h1>Ahoj, {currentPerson.name}.</h1>
+          <p className="lede">
+            Festival je {snapshot.event.status === "open" ? "otvorený" : "zatvorený"}.
+          </p>
+        </section>
+        <section className="home-actions">
+          <Link className="primary-button" href="/admin">
+            <Settings2 aria-hidden="true" size={20} />
+            Riadenie festivalu
+            <ArrowRight aria-hidden="true" size={18} />
+          </Link>
+          <Link className="secondary-button" href="/wall">Otvoriť verejnú stenu</Link>
+          <button
+            className="text-button"
+            onClick={() => void commands.signOut()}
+            type="button"
+          >
+            <LogOut aria-hidden="true" size={17} />
+            Odhlásiť sa
+          </button>
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
+        </section>
+      </main>
     </AppShell>
   );
 }

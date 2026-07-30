@@ -2838,6 +2838,11 @@ button {
   padding: 0;
 }
 
+.own-team-message {
+  min-height: calc(100dvh - 173px);
+  padding: 32px 0;
+}
+
 .signal-form__body {
   flex: 1;
   padding: 18px 0 8px;
