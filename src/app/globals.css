@@ -2465,6 +2465,173 @@ button {
   letter-spacing: -0.05em;
 }
 
+.pancake-market {
+  margin-top: 42px;
+  padding: 28px;
+  border: 1px solid rgba(245, 167, 32, 0.28);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(245, 167, 32, 0.08), transparent 48%),
+    var(--surface);
+}
+
+.pancake-market-heading {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 28px;
+  align-items: start;
+}
+
+.pancake-market-heading h2 {
+  margin-top: 6px;
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.pancake-market-heading > div:first-child > p:last-child {
+  max-width: 58ch;
+  margin-top: 12px;
+  color: var(--muted-strong);
+  line-height: 1.5;
+}
+
+.pancake-market-balance {
+  min-width: 145px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 3px 8px;
+  padding: 15px 17px;
+  border-radius: 15px;
+  background: rgba(245, 167, 32, 0.12);
+  color: var(--amber);
+}
+
+.pancake-market-balance svg {
+  grid-row: 1 / 3;
+}
+
+.pancake-market-balance span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.pancake-market-balance strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.5rem;
+}
+
+.pancake-market-none,
+.pancake-market-readonly {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.pancake-market-readonly {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pancake-market-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.pancake-market-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.pancake-market-card.is-selected {
+  border-color: rgba(98, 197, 192, 0.55);
+  background: rgba(98, 197, 192, 0.09);
+}
+
+.pancake-market-position {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.pancake-market-card h3 {
+  min-width: 0;
+  grid-column: 1 / -1;
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.pancake-market-card > strong {
+  color: var(--amber);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.2rem;
+}
+
+.pancake-market-select,
+.pancake-market-selected,
+.pancake-market-missing {
+  justify-self: end;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.pancake-market-select {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--amber);
+  color: #1a1308;
+  cursor: pointer;
+}
+
+.pancake-market-select:disabled {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.pancake-market-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--cyan);
+}
+
+.pancake-market-missing {
+  color: var(--muted);
+}
+
+.pancake-market-notice {
+  min-height: 1.4em;
+  margin-top: 14px;
+  font-size: 0.76rem;
+}
+
+.pancake-market-notice .is-success {
+  color: var(--cyan);
+}
+
+.pancake-market-notice .is-error {
+  color: var(--coral);
+}
+
 .receipt-signals {
   margin-top: 42px;
   border-top: 1px solid var(--line);
@@ -3654,6 +3821,19 @@ button {
   }
 
   .receipt-total {
+    width: 100%;
+  }
+
+  .pancake-market {
+    padding: 20px;
+  }
+
+  .pancake-market-heading,
+  .pancake-market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pancake-market-balance {
     width: 100%;
   }
 

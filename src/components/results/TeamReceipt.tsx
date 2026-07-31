@@ -1,6 +1,7 @@
 import { formatCredits } from "@/lib/domain/credits";
 import type { FestivalSnapshot, Person, Team } from "@/lib/domain/types";
 import { AudioLines, MessageSquareText, WalletCards } from "lucide-react";
+import { PancakeMarket } from "./PancakeMarket";
 
 const roleLabel = {
   participant: "účastník",
@@ -13,10 +14,12 @@ export function TeamReceipt({
   snapshot,
   team,
   viewer,
+  onSelectPackage,
 }: {
   snapshot: FestivalSnapshot;
   team: Team;
   viewer: Person;
+  onSelectPackage?: (packageId: string) => Promise<void>;
 }) {
   const canView =
     viewer.role === "organizer" ||
@@ -62,6 +65,13 @@ export function TeamReceipt({
           <small>{signals.length} spätných väzieb</small>
         </div>
       </header>
+
+      <PancakeMarket
+        onSelect={onSelectPackage}
+        snapshot={snapshot}
+        team={team}
+        viewer={viewer}
+      />
 
       <section className="receipt-signals">
         {signals.length === 0 ? (

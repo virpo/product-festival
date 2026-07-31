@@ -17,6 +17,9 @@ describe("TeamReceipt", () => {
     expect(
       screen.getByText("Výsledky ešte nie sú odomknuté."),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Palacinková burza" }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows named raw feedback after release without ranking", () => {
@@ -29,5 +32,8 @@ describe("TeamReceipt", () => {
     expect(screen.getByText("25🥞")).toBeInTheDocument();
     expect(screen.queryByText("🥞25")).not.toBeInTheDocument();
     expect(screen.queryByText(/miesto|rank/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Palacinková burza" }),
+    ).toBeInTheDocument();
   });
 });

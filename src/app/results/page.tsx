@@ -62,7 +62,16 @@ export default function ResultsPage() {
         </label>
       ) : null}
       {team ? (
-        <TeamReceipt snapshot={snapshot} team={team} viewer={currentPerson} />
+        <TeamReceipt
+          onSelectPackage={
+            currentPerson.role === "organizer"
+              ? undefined
+              : commands.selectPancakePackage
+          }
+          snapshot={snapshot}
+          team={team}
+          viewer={currentPerson}
+        />
       ) : (
         <main className="route-message">
           <h1>Nemáš priradený tím.</h1>
