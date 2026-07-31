@@ -186,6 +186,8 @@ begin
   available := investor_row.wallet_budget + award_amount - already_spent;
   if signal_amount > available then raise exception 'Nemáš dosť kreditov.'; end if;
 
+  select * into existing_signal from public.signals where event_id = signal_event_id and investor_id = investor_row.id and team_id = signal_team_id;
+
   insert into public.signals (event_id, investor_id, team_id, amount, feedback_text, audio_path)
   values (signal_event_id, investor_row.id, signal_team_id, signal_amount, trim(coalesce(signal_feedback_text, '')), signal_audio_path)
   on conflict (event_id, investor_id, team_id) do update set amount = excluded.amount, feedback_text = excluded.feedback_text, audio_path = excluded.audio_path
