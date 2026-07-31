@@ -46,6 +46,28 @@ describe("ConnectionNotice", () => {
     );
   });
 
+  it("lifts above the dock only when a dock is present", () => {
+    const connection = {
+      status: "retrying" as const,
+      stale: true,
+      attempt: 1,
+      message: "Spojenie vypadlo.",
+    };
+
+    const { rerender } = render(
+      <ConnectionNotice connection={connection} docked onRetry={vi.fn()} />,
+    );
+    // Without this the notice covers the save and delete actions in the dock.
+    expect(screen.getByRole("status")).toHaveClass(
+      "connection-notice--docked",
+    );
+
+    rerender(<ConnectionNotice connection={connection} onRetry={vi.fn()} />);
+    expect(screen.getByRole("status")).not.toHaveClass(
+      "connection-notice--docked",
+    );
+  });
+
   it("stays out of the way while data is live", () => {
     const { container } = render(
       <ConnectionNotice

@@ -9,7 +9,15 @@ The frontend degrades quietly if it runs ahead of the schema: missing
 back to the legacy invested total instead of reporting an error.
 
 - [ ] Apply `202607300001_investment_progress.sql` and
-  `202607310001_wallet_covers_signals.sql` **before** deploying the frontend.
+  `202607310001_wallet_covers_signals.sql` with `npx supabase db push` **before**
+  deploying the frontend.
+- [ ] `202607310001` sets a 3s `lock_timeout` on purpose, so that creating its
+  trigger fails fast instead of queueing ahead of every reader of
+  `public.people`. Under load it can abort with
+  `canceling statement due to lock timeout`. That is safe: the file is
+  idempotent (`create or replace`, `drop trigger if exists`), so re-run it in a
+  quieter moment. If you pasted it into the SQL editor rather than pushing it,
+  run `reset lock_timeout;` in that session afterwards.
 - [ ] Check that nobody already holds less credit than they have invested. The
   migration raises a `wallet below committed signals` notice per offender, but
   that output is easy to miss, so run this in the Supabase SQL editor and
@@ -62,13 +70,16 @@ back to the legacy invested total instead of reporting an error.
   investment with a confirmation, and the wallet and aggregate wall update.
 - [ ] Open that investment again from the overview row, change the amount and
   save. There is still one signal for that team.
-- [ ] Record audio feedback for a second foreign team and save it.
+- [ ] Record audio feedback for a second foreign team, add a short written note
+  as well, and save. The note matters: a signal needs text or audio, so the
+  delete-and-save step below would be rejected on an audio-only signal.
 - [ ] Reopen that signal and start recording again. **Uložiť zmeny** is disabled
   with a "Najprv zastav nahrávanie" hint while recording; the delete action
   stays available. Stop, and the save re-enables.
 - [ ] Re-record over the existing recording, delete it, then **save**. Reopen
-  the signal: no recording is attached. Removal only reaches the database on
-  save, so skipping the save here would leave the original audio in place.
+  the signal: the written note is still there and no recording is attached.
+  Removal only reaches the database on save, so skipping the save here would
+  leave the original audio in place.
 - [ ] Record and save once more on that signal, so a recording remains for the
   released-receipt playback check below.
 - [ ] The wall's progress bar rises as credits are distributed and only reads
