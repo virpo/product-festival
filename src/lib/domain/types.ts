@@ -32,6 +32,26 @@ export type Team = {
   createdAt: string;
 };
 
+export type PancakePackageDraft = {
+  name: string;
+  price: number;
+  position: number;
+};
+
+export type PancakePackage = PancakePackageDraft & {
+  id: string;
+  eventId: string;
+};
+
+export type TeamPancakeSelection = {
+  id: string;
+  eventId: string;
+  teamId: string;
+  packageId: string;
+  selectedBy: string;
+  selectedAt: string;
+};
+
 export type Person = {
   id: string;
   eventId: string;
@@ -143,6 +163,8 @@ export type FestivalSnapshot = {
   teamMembers: TeamMember[];
   visits: Visit[];
   signals: Signal[];
+  pancakePackages: PancakePackage[];
+  pancakeSelections: TeamPancakeSelection[];
   stats: EventStats | null;
 };
 
