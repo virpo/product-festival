@@ -246,6 +246,11 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain(
       "person_with_pancake_selection_cannot_be_removed",
     );
+    expect(
+      sql.match(
+        /update public\.events\s+set updated_at = now\(\)\s+where id = target_event_id;/g,
+      ),
+    ).toHaveLength(2);
     expect(sql).toContain(
       "revoke insert, update, delete on public.pancake_packages",
     );

@@ -184,6 +184,10 @@ begin
     (item ->> 'position')::smallint
   from jsonb_array_elements(target_packages) item;
 
+  update public.events
+  set updated_at = now()
+  where id = target_event_id;
+
   return query
   select package_row.*
   from public.pancake_packages package_row
@@ -290,6 +294,10 @@ begin
     selected_by = excluded.selected_by,
     selected_at = excluded.selected_at
   returning * into saved_selection;
+
+  update public.events
+  set updated_at = now()
+  where id = target_event_id;
 
   return saved_selection;
 end;
