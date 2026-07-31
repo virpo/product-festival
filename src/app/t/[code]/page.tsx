@@ -26,6 +26,7 @@ export default function TeamPage() {
     useFestival();
   const [savedAwards, setSavedAwards] = useState<SignalSaveResult["awards"]>([]);
   const [savedAmount, setSavedAmount] = useState<number | null>(null);
+  const [savedTeamKey, setSavedTeamKey] = useState<string | null>(null);
   // Keyed by person and team: this route component can be preserved across
   // `[code]` changes, and a plain boolean would then suppress the next team's
   // visit for the rest of the session.
@@ -43,6 +44,8 @@ export default function TeamPage() {
 
   const visitKey =
     currentPerson && team ? `${currentPerson.id}:${team.id}` : null;
+  const currentTeamAwards = savedTeamKey === visitKey ? savedAwards : [];
+  const currentTeamSavedAmount = savedTeamKey === visitKey ? savedAmount : null;
 
   // A scan during a brief outage would otherwise burn the whole attempt budget
   // before the network returns and stay latched for good. Re-arm on the
@@ -204,6 +207,7 @@ export default function TeamPage() {
     if (result?.awards?.length) {
       setSavedAwards(result.awards);
       setSavedAmount(input.amount);
+      setSavedTeamKey(`${investorId}:${teamId}`);
       return;
     }
     router.push(
@@ -224,18 +228,18 @@ export default function TeamPage() {
       snapshot={snapshot}
       privateBonusTotal={
         privateBonusTotal -
-        (savedAwards.length
-          ? savedAwards.reduce((total, award) => total + award.amount, 0)
+        (currentTeamAwards.length
+          ? currentTeamAwards.reduce((total, award) => total + award.amount, 0)
           : 0)
       }
     >
-      {savedAwards.length > 0 ? (
+      {currentTeamAwards.length > 0 ? (
         <BonusReveal
-          awards={savedAwards}
+          awards={currentTeamAwards}
           currency={snapshot.event.currency}
           onContinue={() =>
             router.push(
-              `/?saved=${encodeURIComponent(teamCode)}${savedAmount === null ? "" : `&amount=${savedAmount}`}`,
+              `/?saved=${encodeURIComponent(teamCode)}${currentTeamSavedAmount === null ? "" : `&amount=${currentTeamSavedAmount}`}`,
             )
           }
         />
