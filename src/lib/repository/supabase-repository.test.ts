@@ -39,6 +39,7 @@ function fakeClient() {
         data: { session: { user: { id: "auth-1" } } },
         error: null,
       }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
     },
     channel: vi.fn().mockReturnValue(channel),
     from: vi.fn().mockReturnValue({
@@ -91,6 +92,46 @@ describe("SupabaseFestivalRepository", () => {
       claim_event_slug: "ai-build-week",
     });
     expect(person.name).toBe("Peter");
+  });
+
+  it("replaces a deleted anonymous identity and retries the claim once", async () => {
+    const { client } = fakeClient();
+    client.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: "deleted-auth-user" } } },
+    });
+    client.rpc
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          code: "23503",
+          message:
+            'insert or update on table "people" violates foreign key constraint "people_auth_user_id_fkey"',
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          id: "person-1",
+          event_id: "event-1",
+          name: "Peter",
+          role: "participant",
+          wallet_budget: 100,
+          access_code: "PETER",
+          auth_user_id: "auth-2",
+          last_seen_at: null,
+          created_at: "2026-07-24T00:00:00Z",
+        },
+        error: null,
+      });
+    const repository = new SupabaseFestivalRepository(client as never, {
+      eventSlug: "ai-build-week",
+    });
+
+    const person = await repository.claimPerson("PETER");
+
+    expect(client.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(client.auth.signInAnonymously).toHaveBeenCalledOnce();
+    expect(client.rpc).toHaveBeenCalledTimes(2);
+    expect(person.authUserId).toBe("auth-2");
   });
 
   it("maps an occupied access code to a typed takeover error", async () => {

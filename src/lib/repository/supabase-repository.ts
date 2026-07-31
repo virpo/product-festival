@@ -98,6 +98,16 @@ function fail(error: { message: string } | null, fallback: string) {
   }
 }
 
+function isDeletedAuthIdentityError(
+  error: { code?: string; message: string } | null,
+): boolean {
+  return Boolean(
+    error &&
+      error.code === "23503" &&
+      error.message.includes("people_auth_user_id_fkey"),
+  );
+}
+
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -463,22 +473,37 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     accessCode: string,
     options: ClaimPersonOptions = {},
   ): Promise<Person> {
+    const normalizedCode = accessCode.trim().toUpperCase();
     const session = await this.client.auth.getSession();
     if (!session.data.session) {
       const { error } = await this.client.auth.signInAnonymously();
       fail(error, "Anonymné prihlásenie zlyhalo.");
     }
-    const { data, error } = await this.client.rpc("claim_person", {
-      allow_takeover: options.takeover ?? false,
-      claim_code: accessCode.trim().toUpperCase(),
-      claim_event_slug: this.options.eventSlug,
-    });
+
+    const claim = () =>
+      this.client.rpc("claim_person", {
+        allow_takeover: options.takeover ?? false,
+        claim_code: normalizedCode,
+        claim_event_slug: this.options.eventSlug,
+      });
+
+    let { data, error } = await claim();
+    if (isDeletedAuthIdentityError(error)) {
+      const { error: signOutError } = await this.client.auth.signOut({
+        scope: "local",
+      });
+      fail(signOutError, "Obnovenie prihlásenia zlyhalo.");
+      const { error: signInError } = await this.client.auth.signInAnonymously();
+      fail(signInError, "Anonymné prihlásenie zlyhalo.");
+      ({ data, error } = await claim());
+    }
+
     if (error?.message.includes("access_code_in_use")) {
       throw new AccessCodeInUseError();
     }
     fail(error, "Neznámy prístupový kód.");
     const row = Array.isArray(data) ? data[0] : data;
-    return mapPerson(row, accessCode.trim().toUpperCase());
+    return mapPerson(row, normalizedCode);
   }
 
   async signOut(): Promise<void> {
