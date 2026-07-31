@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCredits } from "@/lib/domain/credits";
 import { remainingWallet } from "@/lib/domain/rules";
 import type {
   FestivalSnapshot,
@@ -8,23 +9,40 @@ import type {
   SignalInput,
   Team,
 } from "@/lib/domain/types";
-import { Check, ExternalLink, Minus, Plus } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ExternalLink,
+  Minus,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import Link from "next/link";
+import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
 import { AudioRecorder } from "./AudioRecorder";
+import { ParticipantDock } from "./ParticipantDock";
 
 type SignalFormProps = {
+  backHref: string;
+  backLabel: string;
   snapshot: FestivalSnapshot;
   person: Person;
   team: Team;
   existingSignal?: Signal | null;
-  onSave: (input: SignalInput, audio?: Blob | null) => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+  onSave(input: SignalInput, audio?: Blob | null): Promise<void> | void;
 };
 
+const amountPresets = [5, 10, 25, 50];
+
 export function SignalForm({
+  backHref,
+  backLabel,
   snapshot,
   person,
   team,
   existingSignal = null,
+  onDelete,
   onSave,
 }: SignalFormProps) {
   const available = useMemo(
@@ -32,12 +50,27 @@ export function SignalForm({
     [existingSignal?.amount, person.id, snapshot],
   );
   const maximum = Math.min(snapshot.event.maxPerTeam, available);
-  const [amount, setAmount] = useState(existingSignal?.amount ?? Math.min(10, maximum));
+  const [amount, setAmount] = useState(
+    existingSignal?.amount ?? Math.min(10, maximum),
+  );
   const [feedback, setFeedback] = useState(existingSignal?.feedbackText ?? "");
   const [audio, setAudio] = useState<Blob | null>(null);
+  const [keepExistingAudio, setKeepExistingAudio] = useState(
+    Boolean(existingSignal?.audioPath),
+  );
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // The recorded Blob only reaches this form from the recorder's later `stop`
+  // event, so saving mid-recording would persist the previous audio path and
+  // throw the recording away when navigation unmounts the recorder. Deleting
+  // discards the whole signal, so it stays available.
+  const [recording, setRecording] = useState(false);
+  // Bumped when we navigate away, so a microphone request still waiting on the
+  // permission prompt is abandoned instead of capturing into a dead form. A ref
+  // rather than state: the recorder has to observe the bump synchronously.
+  const cancelTokenRef = useRef(0);
+  const readCancelToken = useCallback(() => cancelTokenRef.current, []);
 
   function setSafeAmount(value: number) {
     setAmount(Math.max(0, Math.min(maximum, Number.isFinite(value) ? value : 0)));
@@ -46,13 +79,13 @@ export function SignalForm({
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setSaved(false);
 
-    if (!feedback.trim() && !audio && !existingSignal?.audioPath) {
+    if (!feedback.trim() && !audio && !keepExistingAudio) {
       setError("Pridaj feedback alebo hlasovú poznámku.");
       return;
     }
 
+    cancelTokenRef.current += 1;
     setSaving(true);
     try {
       await onSave(
@@ -61,125 +94,213 @@ export function SignalForm({
           teamId: team.id,
           amount,
           feedbackText: feedback,
-          audioPath:
-            audio || existingSignal?.audioPath
-              ? existingSignal?.audioPath ?? "pending-recording"
+          audioPath: audio
+            ? "pending-recording"
+            : keepExistingAudio
+              ? existingSignal?.audioPath ?? null
               : null,
         },
         audio,
       );
-      setSaved(true);
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Feedback sa nepodarilo uložiť.",
+        reason instanceof Error
+          ? reason.message
+          : "Feedback sa nepodarilo uložiť.",
       );
     } finally {
       setSaving(false);
     }
   }
 
+  async function remove() {
+    if (
+      !onDelete ||
+      !window.confirm(`Odstrániť investíciu a feedback pre ${team.name}?`)
+    ) {
+      return;
+    }
+
+    cancelTokenRef.current += 1;
+    setDeleting(true);
+    setError("");
+    try {
+      await onDelete();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Investíciu sa nepodarilo odstrániť.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <form className="signal-form" onSubmit={submit}>
-      <div className="team-heading">
-        <div>
-          <p className="eyebrow">
-            Tím {team.number} · {team.tableLabel}
+      <div className="signal-form__body">
+        <header className="signal-team">
+          <span
+            aria-hidden="true"
+            className="signal-team__mark"
+            style={{ background: team.color }}
+          />
+          <div>
+            <p className="panel-kicker">
+              {existingSignal ? "Upraviť" : `Tím ${team.number}`}
+            </p>
+            <h1>{team.name}</h1>
+          </div>
+          {team.productUrl ? (
+            <a
+              className="signal-product-link"
+              href={team.productUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Otvoriť produkt
+              <ExternalLink aria-hidden="true" size={16} />
+            </a>
+          ) : null}
+        </header>
+
+        <section className="signal-feedback">
+          <p className="panel-kicker">Feedback</p>
+          <AudioRecorder
+            existingUrl={
+              keepExistingAudio ? existingSignal?.audioUrl ?? null : null
+            }
+            readCancelToken={readCancelToken}
+            hasExisting={keepExistingAudio}
+            onBusyChange={setRecording}
+            onChange={setAudio}
+            onRemoveExisting={() => setKeepExistingAudio(false)}
+            value={audio}
+          />
+          <label className="signal-write-label" htmlFor={`feedback-${team.id}`}>
+            Alebo napíš
+          </label>
+          <textarea
+            aria-label="Napísaný feedback"
+            className="field-textarea signal-textarea"
+            id={`feedback-${team.id}`}
+            onChange={(event) => setFeedback(event.target.value)}
+            placeholder="Čo fungovalo? Čo by si zmenil?"
+            rows={3}
+            value={feedback}
+          />
+        </section>
+
+        <section className="signal-amount">
+          <div className="signal-section-label">
+            <span>Investícia</span>
+            <span>
+              max {formatCredits(maximum, snapshot.event.currency)}
+            </span>
+          </div>
+          <div className="amount-control">
+            <button
+              aria-label="Odobrať kredit"
+              onClick={() => setSafeAmount(amount - 1)}
+              type="button"
+            >
+              <Minus aria-hidden="true" />
+            </button>
+            <label>
+              <span className="sr-only">Suma</span>
+              <input
+                aria-label="Suma"
+                inputMode="numeric"
+                max={maximum}
+                min={0}
+                onChange={(event) =>
+                  setSafeAmount(event.currentTarget.valueAsNumber)
+                }
+                step={1}
+                type="number"
+                value={amount}
+              />
+              <span aria-hidden="true">{snapshot.event.currency}</span>
+            </label>
+            <button
+              aria-label="Pridať kredit"
+              onClick={() => setSafeAmount(amount + 1)}
+              type="button"
+            >
+              <Plus aria-hidden="true" />
+            </button>
+          </div>
+          <div className="amount-presets">
+            {amountPresets
+              .filter((preset) => preset <= maximum)
+              .map((preset) => (
+                <button
+                  aria-label={`Nastaviť ${formatCredits(
+                    preset,
+                    snapshot.event.currency,
+                  )}`}
+                  key={preset}
+                  onClick={() => setSafeAmount(preset)}
+                  type="button"
+                >
+                  {formatCredits(preset, snapshot.event.currency)}
+                </button>
+              ))}
+          </div>
+          <p className="signal-edit-note">
+            Môžeš neskôr zmeniť.
           </p>
-          <h1>{team.name}</h1>
-          <p>{team.description}</p>
-        </div>
-        <span className="team-color" style={{ background: team.color }} />
+        </section>
+
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
       </div>
 
-      {team.productUrl ? (
-        <a
-          className="try-product"
-          href={team.productUrl}
-          rel="noreferrer"
-          target="_blank"
-        >
-          Vyskúšať produkt
-          <ExternalLink aria-hidden="true" size={18} />
-        </a>
-      ) : null}
-
-      <section className="signal-section amount-section">
-        <div className="section-heading">
-          <div>
-            <p className="panel-kicker">Tvoj signál</p>
-            <h2>Koľko do toho dáš?</h2>
+      <ParticipantDock>
+        <div className="signal-dock">
+          <div className="signal-dock__row">
+            <Link
+              aria-label={`Späť na ${backLabel}`}
+              className="signal-back"
+              href={backHref}
+            >
+              <ArrowLeft aria-hidden="true" />
+            </Link>
+            <button
+              className="signal-save"
+              disabled={saving || deleting || recording}
+              type="submit"
+            >
+              {saving
+                ? "Ukladám…"
+                : existingSignal
+                  ? "Uložiť zmeny"
+                  : "Poslať feedback"}
+              <ArrowRight aria-hidden="true" size={20} />
+            </button>
           </div>
-          <span>zostáva {snapshot.event.currency}{available}</span>
+          {recording ? (
+            <p className="field-note signal-dock__hint">
+              Najprv zastav nahrávanie.
+            </p>
+          ) : null}
+          {existingSignal && onDelete ? (
+            <button
+              className="signal-delete"
+              disabled={saving || deleting}
+              onClick={() => void remove()}
+              type="button"
+            >
+              <Trash2 aria-hidden="true" size={16} />
+              {deleting ? "Odstraňujem…" : "Odstrániť investíciu"}
+            </button>
+          ) : null}
         </div>
-        <div className="amount-control">
-          <button
-            aria-label="Odobrať euro"
-            onClick={() => setSafeAmount(amount - 1)}
-            type="button"
-          >
-            <Minus aria-hidden="true" />
-          </button>
-          <label>
-            <span className="sr-only">Suma</span>
-            <span aria-hidden="true">{snapshot.event.currency}</span>
-            <input
-              aria-label="Suma"
-              inputMode="numeric"
-              max={maximum}
-              min={0}
-              onChange={(event) => setSafeAmount(event.currentTarget.valueAsNumber)}
-              step={1}
-              type="number"
-              value={amount}
-            />
-          </label>
-          <button
-            aria-label="Pridať euro"
-            onClick={() => setSafeAmount(amount + 1)}
-            type="button"
-          >
-            <Plus aria-hidden="true" />
-          </button>
-        </div>
-        <p className="field-note">
-          Maximum pre jeden tím je {snapshot.event.currency}
-          {snapshot.event.maxPerTeam}. Nula znamená feedback bez investície.
-        </p>
-      </section>
-
-      <section className="signal-section">
-        <label className="section-heading" htmlFor={`feedback-${team.id}`}>
-          <div>
-            <p className="panel-kicker">Feedback</p>
-            <h2>Čo by mal tím vedieť?</h2>
-          </div>
-        </label>
-        <textarea
-          className="field-textarea signal-textarea"
-          id={`feedback-${team.id}`}
-          onChange={(event) => setFeedback(event.target.value)}
-          placeholder="Čo fungovalo? Kde si sa zasekol? Čo by si skúsil ďalej?"
-          rows={5}
-          value={feedback}
-        />
-        <div className="or-divider"><span>alebo</span></div>
-        <AudioRecorder onChange={setAudio} value={audio} />
-      </section>
-
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {saved ? (
-        <p className="save-confirmation" role="status">
-          <Check aria-hidden="true" size={18} /> Uložené. Počas festivalu to môžeš
-          zmeniť.
-        </p>
-      ) : null}
-      <button className="primary-button signal-submit" disabled={saving} type="submit">
-        {saving ? "Ukladám…" : existingSignal ? "Uložiť zmeny" : "Poslať investíciu a feedback"}
-      </button>
+      </ParticipantDock>
     </form>
   );
 }

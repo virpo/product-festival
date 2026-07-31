@@ -65,6 +65,8 @@ describe("AdminDashboard", () => {
 
     await user.click(screen.getByRole("tab", { name: "Ľudia" }));
 
+    expect(screen.getAllByText("100🥞").length).toBeGreaterThan(0);
+    expect(screen.queryByText("🥞100")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", {
         name: `Odstrániť ${organizer.name}`,
@@ -96,5 +98,6 @@ describe("AdminDashboard", () => {
     expect(
       screen.queryByRole("button", { name: "Odomknúť výsledky" }),
     ).not.toBeInTheDocument();
+    expect(screen.getByText("70🥞")).toBeInTheDocument();
   });
 });

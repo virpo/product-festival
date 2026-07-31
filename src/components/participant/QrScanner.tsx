@@ -1,9 +1,11 @@
 "use client";
 
 import { parseTeamCode } from "@/lib/domain/qr";
-import { ArrowRight, Camera, Keyboard } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ParticipantDock } from "./ParticipantDock";
 
 type Scanner = {
   stop(): Promise<void>;
@@ -52,11 +54,19 @@ export function QrScanner() {
           },
           () => undefined,
         );
-        if (active) setState("ready");
+        if (!active) {
+          // Unmounted while the camera was still starting. The cleanup's
+          // stop() ran before html5-qrcode left its NOT_STARTED state and was
+          // discarded, so this is the only remaining chance to release the
+          // camera the start() call just acquired.
+          await stopAndClear(scanner);
+          return;
+        }
+        setState("ready");
       } catch {
         if (active) {
           setState("error");
-          setError("Kamera sa nedá použiť. Zadaj krátky kód z papiera.");
+          setError("Kamera sa nedá použiť. Zadaj kód tímu.");
         }
       }
     }
@@ -75,54 +85,71 @@ export function QrScanner() {
     event.preventDefault();
     const code = parseTeamCode(manualCode);
     if (!code) {
-      setError("Zadaj kód tímu z papiera.");
+      setError("Zadaj kód tímu.");
       return;
     }
     router.push(`/t/${encodeURIComponent(code)}`);
   }
 
   return (
-    <main className="scanner-page">
-      <header className="page-heading scanner-heading">
-        <p className="eyebrow">Ďalší tím</p>
-        <h1>Naskenuj QR kód</h1>
-        <p>QR nájdeš na stole pri produkte.</p>
-      </header>
-      <section className="scanner-card">
-        <div className={`scanner-viewport scanner-viewport--${state}`}>
-          <div id="festival-qr-reader" />
-          {state === "starting" ? (
-            <div className="scanner-placeholder">
-              <Camera aria-hidden="true" />
-              <span>Zapínam kameru…</span>
-            </div>
-          ) : null}
-          <span className="scan-corner scan-corner--a" />
-          <span className="scan-corner scan-corner--b" />
-          <span className="scan-corner scan-corner--c" />
-          <span className="scan-corner scan-corner--d" />
-        </div>
-        {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <div className="or-divider"><span>alebo</span></div>
-        <form className="manual-code" onSubmit={submitManual}>
-          <label htmlFor="manual-team-code">
-            <Keyboard aria-hidden="true" size={17} /> Kód tímu
-          </label>
-          <div>
+    <div className="scanner-flow">
+      <main className="scanner-page">
+        <header className="scanner-heading">
+          <p className="panel-kicker">Skener</p>
+          <h1>Naskenuj QR kód</h1>
+        </header>
+        <section className="scanner-card">
+          <div className={`scanner-viewport scanner-viewport--${state}`}>
+            <div id="festival-qr-reader" />
+            {state === "starting" ? (
+              <div className="scanner-placeholder">
+                <Camera aria-hidden="true" />
+                <span>Zapínam kameru…</span>
+              </div>
+            ) : null}
+            <span className="scan-corner scan-corner--a" />
+            <span className="scan-corner scan-corner--b" />
+            <span className="scan-corner scan-corner--c" />
+            <span className="scan-corner scan-corner--d" />
+          </div>
+        </section>
+        {error ? (
+          <p className="form-error scanner-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </main>
+
+      <ParticipantDock>
+        <div className="scanner-dock">
+          <Link
+            aria-label="Späť na Prehľad"
+            className="scanner-back"
+            href="/"
+          >
+            <ArrowLeft aria-hidden="true" />
+          </Link>
+          <form className="scanner-manual" onSubmit={submitManual}>
+            <label className="sr-only" htmlFor="manual-team-code">
+              Kód tímu
+            </label>
             <input
               autoCapitalize="characters"
+              autoComplete="off"
               className="field-input"
               id="manual-team-code"
-              onChange={(event) => setManualCode(event.target.value.toUpperCase())}
-              placeholder="QUEUE7"
+              onChange={(event) =>
+                setManualCode(event.target.value.toUpperCase())
+              }
+              placeholder="KÓD TÍMU"
               value={manualCode}
             />
             <button aria-label="Otvoriť tím" type="submit">
               <ArrowRight aria-hidden="true" />
             </button>
-          </div>
-        </form>
-      </section>
-    </main>
+          </form>
+        </div>
+      </ParticipantDock>
+    </div>
   );
 }

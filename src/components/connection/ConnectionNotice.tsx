@@ -7,12 +7,15 @@ import { useFestival } from "@/lib/repository/useFestival";
 
 type ConnectionNoticeProps = {
   connection: ConnectionState;
+  /** Raise the notice above a participant dock and the save snackbar. */
+  docked?: boolean;
   onRetry: () => Promise<void>;
   variant?: "app" | "wall";
 };
 
 export function ConnectionNotice({
   connection,
+  docked = false,
   onRetry,
   variant = "app",
 }: ConnectionNoticeProps) {
@@ -22,7 +25,11 @@ export function ConnectionNotice({
 
   return (
     <aside
-      className={`connection-notice connection-notice--${variant}`}
+      // The `app` variant carries no rule of its own — vertical placement
+      // belongs to `--docked` — so it is not emitted.
+      className={`connection-notice${
+        variant === "wall" ? " connection-notice--wall" : ""
+      }${docked ? " connection-notice--docked" : ""}`}
       role="status"
     >
       <WifiOff aria-hidden="true" size={variant === "wall" ? 22 : 18} />
@@ -42,13 +49,25 @@ export function ConnectionNotice({
 
 export function FestivalConnectionNotice() {
   const pathname = usePathname();
-  const { commands, connection } = useFestival();
+  const { commands, connection, currentPerson } = useFestival();
   const variant =
     pathname === "/wall" || pathname === "/summary" ? "wall" : "app";
+  // Only the participant screens carry the sticky dock and the save snackbar
+  // that the notice has to clear. Lifting it on entry, admin or results screens
+  // would float it over unrelated content and risk clipping it on a short
+  // viewport. `/` is the access-code entry screen until somebody is signed in,
+  // and the organizer home after that, so it only qualifies for a participant.
+  const isParticipantHome =
+    pathname === "/" && Boolean(currentPerson) &&
+    currentPerson?.role !== "organizer";
+  const docked =
+    variant === "app" &&
+    (isParticipantHome || pathname === "/scan" || pathname.startsWith("/t/"));
 
   return (
     <ConnectionNotice
       connection={connection}
+      docked={docked}
       onRetry={commands.refresh}
       variant={variant}
     />

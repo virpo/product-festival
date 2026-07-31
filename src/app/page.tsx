@@ -1,5 +1,10 @@
 import { FestivalEntry } from "@/components/auth/FestivalEntry";
+import { Suspense } from "react";
 
 export default function Home() {
-  return <FestivalEntry />;
+  return (
+    <Suspense fallback={null}>
+      <FestivalEntry />
+    </Suspense>
+  );
 }

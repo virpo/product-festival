@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { OrganizerHeader } from "@/components/admin/OrganizerHeader";
 import { AppShell } from "@/components/brand/AppShell";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { useFestival } from "@/lib/repository/useFestival";
@@ -33,7 +34,16 @@ export default function AdminPage() {
   }
 
   return (
-    <AppShell mode={mode}>
+    <AppShell
+      header={
+        <OrganizerHeader
+          eventStatus={snapshot.event.status}
+          name={currentPerson.name}
+          onSignOut={commands.signOut}
+        />
+      }
+      mode={mode}
+    >
       <AdminDashboard
         commands={commands}
         currentPerson={currentPerson}

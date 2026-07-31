@@ -32,12 +32,13 @@ The public wall shows shared progress and time, never a team leaderboard.
 
 ![Public projector wall showing the live Product Festival](docs/images/public-wall.png)
 
-Participants enter on their phones, then scan the QR code at a team’s table.
+Participants see their wallet, progress and editable investments in one
+overview. Scanning a team opens one compact voice-first feedback screen.
 
 <p align="center">
-  <img src="docs/images/participant-entry.png" width="360" alt="Participant entry screen on a phone">
+  <img src="docs/images/participant-entry.png" width="360" alt="Participant overview on a phone">
   &nbsp;&nbsp;&nbsp;
-  <img src="docs/images/participant-investment.png" width="360" alt="Investment and feedback screen on a phone">
+  <img src="docs/images/participant-investment.png" width="360" alt="Voice-first investment and feedback screen on a phone">
 </p>
 
 The organizer controls the event and watches participation in real time.
@@ -52,8 +53,8 @@ The organizer controls the event and watches participation in real time.
 - browser QR scanner with a manual-code fallback;
 - exact investment amounts with `+` / `−` controls;
 - written or microphone-recorded feedback;
-- editable personal portfolio while investing is open;
-- projector wall with countdown, coverage and aggregate activity;
+- wallet, progress and editable investments in one participant overview;
+- projector wall with countdown, distributed-budget progress and aggregate activity;
 - organizer controls for `draft → open → locked → released`;
 - private team receipts after release;
 - Supabase Auth, Postgres, Realtime, Storage and RLS;
@@ -89,7 +90,7 @@ Demo data lives in `localStorage` and syncs between tabs with
 | `/` | Access code and participant home |
 | `/scan` | QR camera and manual team code |
 | `/t/[code]` | Product, investment and feedback |
-| `/portfolio` | Edit the current person's signals |
+| `/portfolio` | Legacy redirect to the participant overview |
 | `/admin` | Event, team and people controls |
 | `/admin/qr` | Print or download team QR cards |
 | `/wall` | Public projector view |

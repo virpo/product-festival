@@ -1,4 +1,5 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QrScanner } from "./QrScanner";
 
@@ -54,6 +55,34 @@ describe("QrScanner", () => {
     expect(mocks.clear).toHaveBeenCalledOnce();
   });
 
+  it("stops a camera that finishes starting after unmount", async () => {
+    let finishStarting = () => undefined;
+    mocks.start.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStarting = resolve;
+        }),
+    );
+    // html5-qrcode rejects stop() until start() has left its NOT_STARTED state.
+    mocks.stop.mockImplementationOnce(() => {
+      throw new Error("Cannot stop, scanner is not running or paused.");
+    });
+    mocks.stop.mockResolvedValue(undefined);
+
+    const { unmount } = render(<QrScanner />);
+
+    await waitFor(() => expect(mocks.start).toHaveBeenCalledOnce());
+    unmount();
+
+    await act(async () => {
+      finishStarting();
+      await Promise.resolve();
+    });
+
+    expect(mocks.stop).toHaveBeenCalledTimes(2);
+    expect(mocks.clear).toHaveBeenCalled();
+  });
+
   it("does not crash when stop throws before the camera starts", async () => {
     mocks.start.mockRejectedValueOnce(new Error("Camera unavailable"));
     mocks.stop.mockImplementationOnce(() => {
@@ -65,5 +94,23 @@ describe("QrScanner", () => {
     await waitFor(() => expect(mocks.start).toHaveBeenCalledOnce());
 
     expect(() => unmount()).not.toThrow();
+  });
+
+  it("keeps scanning, manual entry and the overview escape in one flow", async () => {
+    const user = userEvent.setup();
+    render(<QrScanner />);
+
+    expect(screen.getByText("Naskenuj QR kód")).toBeInTheDocument();
+    expect(screen.queryByText("QR nájdeš na stole pri produkte."))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Späť na Prehľad" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+
+    await user.type(screen.getByLabelText("Kód tímu"), "queue7");
+    await user.click(screen.getByRole("button", { name: "Otvoriť tím" }));
+
+    expect(mocks.router.push).toHaveBeenCalledWith("/t/QUEUE7");
   });
 });

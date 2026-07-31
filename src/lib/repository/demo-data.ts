@@ -138,7 +138,7 @@ export function createDemoSnapshot(date = new Date()): FestivalSnapshot {
       name: "AI Build Week Product Festival",
       slug: "ai-build-week",
       status: "open",
-      currency: "€",
+      currency: "🥞",
       walletDefault: 100,
       maxPerTeam: 50,
       coverageTarget: 75,

@@ -16,7 +16,7 @@ update public.events
 set
   name = 'AI Build Week Product Festival',
   status = 'open',
-  currency = '$',
+  currency = '🥞',
   wallet_default = 100,
   max_per_team = 50,
   coverage_target = 75,

@@ -3,6 +3,7 @@ import type {
   Signal,
   SignalInput,
 } from "./types";
+import { formatCredits } from "./credits";
 
 export class FestivalRuleError extends Error {
   constructor(message: string) {
@@ -123,7 +124,10 @@ export function validateSignal(
 
   if (input.amount > snapshot.event.maxPerTeam) {
     throw new FestivalRuleError(
-      `Do jedného tímu môžeš dať najviac ${snapshot.event.currency}${snapshot.event.maxPerTeam}.`,
+      `Do jedného tímu môžeš dať najviac ${formatCredits(
+        snapshot.event.maxPerTeam,
+        snapshot.event.currency,
+      )}.`,
     );
   }
 

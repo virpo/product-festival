@@ -16,6 +16,14 @@ const reliabilityMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607290001_festival_reliability.sql",
 );
+const investmentProgressMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607300001_investment_progress.sql",
+);
+const walletCoversSignalsMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310001_wallet_covers_signals.sql",
+);
 
 describe("Supabase schema contract", () => {
   it("defines protected tables and aggregate realtime state", () => {
@@ -119,5 +127,51 @@ describe("Supabase schema contract", () => {
         `alter publication supabase_realtime add table public.${table}`,
       );
     }
+  });
+
+  it("publishes wallet distribution toward one hundred percent", () => {
+    const sql = readFileSync(
+      investmentProgressMigrationPath,
+      "utf8",
+    ).toLowerCase();
+
+    expect(sql).toContain("budget_total");
+    expect(sql).toContain("budget_distributed");
+    expect(sql).toContain("budget_remaining");
+    expect(sql).toContain("budget_distributed_percent");
+    expect(sql).toContain("p.role <> 'organizer'");
+    expect(sql).toContain("greatest(");
+    // 100% must mean the budget is gone, so the percentage floors below
+    // completion instead of rounding up to a full bar. Mirrors
+    // deriveEventStats in src/lib/domain/stats.ts.
+    expect(sql).toContain("when distributed >= total then 100");
+    expect(sql).toContain("floor(100.0 * distributed / total)");
+    expect(sql).not.toContain("round(100.0 * distributed / total)");
+    expect(sql).toContain("refresh_event_stats");
+  });
+
+  it("keeps a wallet at or above the credits already committed", () => {
+    const sql = readFileSync(
+      walletCoversSignalsMigrationPath,
+      "utf8",
+    ).toLowerCase();
+
+    // save_person ships in an already-applied migration, so the invariant is
+    // enforced by a trigger that every write path passes through.
+    expect(sql).toContain("create or replace function public.enforce_wallet_covers_signals");
+    expect(sql).toContain("before update of wallet_budget on public.people");
+    expect(sql).toContain("wallet_below_committed_signals");
+    expect(sql).toContain("from public.signals");
+  });
+
+  it("moves the bootstrapped event onto the pancake currency", () => {
+    const sql = readFileSync(investmentProgressMigrationPath, "utf8");
+
+    // Both seeds insert with `on conflict do nothing`, so only a forward
+    // migration can change the currency the bootstrap migration already wrote.
+    expect(sql).toContain("update public.events");
+    expect(sql).toContain("set currency = '🥞'");
+    expect(sql).toContain("where slug = 'ai-build-week'");
+    expect(sql).toContain("and currency = '$'");
   });
 });

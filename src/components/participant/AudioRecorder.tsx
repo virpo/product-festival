@@ -1,64 +1,133 @@
 "use client";
 
-import { Mic, Pause, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Mic, Pause, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type RecorderState = "idle" | "requesting" | "recording" | "recorded" | "error";
 
+// Browsers report codec-qualified types such as `audio/webm;codecs=opus`, but
+// the festival-feedback bucket allows exact base types only, and Supabase
+// Storage compares the full subtype. Upload the base type or the recording is
+// rejected after the participant has already made it.
+export function baseMimeType(value: string | undefined): string {
+  const base = (value ?? "").split(";")[0].trim().toLowerCase();
+  return base || "audio/webm";
+}
+
 type AudioRecorderProps = {
+  existingUrl?: string | null;
+  /**
+   * Whether a recording is attached to the saved signal. Kept separate from
+   * `existingUrl` because a signed-URL failure yields a playable-less recording
+   * that is still attached, and the participant must still be able to remove it.
+   */
+  hasExisting?: boolean;
   value?: Blob | null;
-  onChange: (value: Blob | null) => void;
+  onChange(value: Blob | null): void;
+  /**
+   * Reports whether a capture is in flight. Only `recording` counts: during
+   * `requesting` nothing has been captured yet, so saving loses nothing and the
+   * participant must stay free to type instead if they never answer the prompt.
+   */
+  onBusyChange?(busy: boolean): void;
+  /**
+   * Reads a counter the parent bumps to abandon a microphone request that is
+   * still pending. Submitting or deleting navigates away, and a permission
+   * granted after that would otherwise start a capture nobody can reach. It is
+   * a getter rather than a prop value so the parent can bump it synchronously —
+   * a value mirrored through an effect would still be stale for one task, which
+   * is precisely the window this guard exists to close.
+   */
+  readCancelToken?(): number;
+  onRemoveExisting?(): void;
 };
 
-export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
-  const [state, setState] = useState<RecorderState>(value ? "recorded" : "idle");
+export function AudioRecorder({
+  existingUrl = null,
+  hasExisting = false,
+  value = null,
+  readCancelToken,
+  onChange,
+  onBusyChange,
+  onRemoveExisting,
+}: AudioRecorderProps) {
+  const hasRecording = Boolean(value) || Boolean(existingUrl) || hasExisting;
+  const [state, setState] = useState<RecorderState>(
+    hasRecording ? "recorded" : "idle",
+  );
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const audioUrl = useMemo(
+  const mountedRef = useRef(true);
+
+  const objectUrl = useMemo(
     () => (value ? URL.createObjectURL(value) : null),
     [value],
   );
+  const audioUrl = objectUrl ?? existingUrl;
+
+  // Held in a ref so a parent passing a fresh callback each render cannot
+  // retrigger the effect below.
+  const busyRef = useRef(onBusyChange);
+  useEffect(() => {
+    busyRef.current = onBusyChange;
+  }, [onBusyChange]);
+
+  useEffect(() => {
+    busyRef.current?.(state === "recording");
+  }, [state]);
 
   useEffect(() => {
     if (state !== "recording") {
       return;
     }
 
-    const timer = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    const timer = window.setInterval(() => setSeconds((current) => current + 1), 1000);
     return () => window.clearInterval(timer);
   }, [state]);
 
-  useEffect(
-    () => () => {
-      if (
-        recorderRef.current &&
-        recorderRef.current.state !== "inactive"
-      ) {
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      if (recorderRef.current && recorderRef.current.state !== "inactive") {
         recorderRef.current.stop();
       }
       streamRef.current?.getTracks().forEach((track) => track.stop());
-    },
-    [],
-  );
+      streamRef.current = null;
+    };
+  }, []);
+
+  function releaseStream() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+  }
 
   useEffect(() => {
-    if (!audioUrl) {
+    if (!objectUrl) {
       return;
     }
 
-    return () => URL.revokeObjectURL(audioUrl);
-  }, [audioUrl]);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [objectUrl]);
+
+  // A failed start must never hide a recording that is still attached to the
+  // signal: the empty error state offers no delete control, so the participant
+  // would be shown "no recording" while the old one is still submitted.
+  function failStart(message: string) {
+    setError(message);
+    setState(hasRecording ? "recorded" : "error");
+  }
 
   async function start() {
     if (
       typeof MediaRecorder === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      setState("error");
-      setError("Nahrávanie v tomto prehliadači nefunguje. Feedback môžeš napísať.");
+      failStart("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
       return;
     }
 
@@ -66,11 +135,29 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
     setError("");
     setSeconds(0);
     chunksRef.current = [];
+    const requestedAt = readCancelToken?.() ?? 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Retain the stream before anything else can throw, so every failure
+      // path below still has a handle to stop the microphone with.
       streamRef.current = stream;
+
+      // The participant can leave, save or delete while the permission prompt
+      // is open. The unmount cleanup already ran, or the parent abandoned the
+      // request, so nothing else would ever see this stream.
+      if (!mountedRef.current) {
+        releaseStream();
+        return;
+      }
+
+      if ((readCancelToken?.() ?? 0) !== requestedAt) {
+        releaseStream();
+        setState(hasRecording ? "recorded" : "idle");
+        return;
+      }
+
+      const recorder = new MediaRecorder(stream);
       recorderRef.current = recorder;
       recorder.addEventListener("dataavailable", (event) => {
         if (event.data.size > 0) {
@@ -79,17 +166,27 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
       });
       recorder.addEventListener("stop", () => {
         const blob = new Blob(chunksRef.current, {
-          type: recorder.mimeType || "audio/webm",
+          type: baseMimeType(recorder.mimeType),
         });
         stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) {
+          streamRef.current = null;
+        }
         onChange(blob);
         setState("recorded");
       });
       recorder.start();
       setState("recording");
     } catch {
-      setState("error");
-      setError("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
+      releaseStream();
+      if (!mountedRef.current) {
+        return;
+      }
+      if ((readCancelToken?.() ?? 0) !== requestedAt) {
+        setState(hasRecording ? "recorded" : "idle");
+        return;
+      }
+      failStart("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
     }
   }
 
@@ -98,7 +195,11 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
   }
 
   function remove() {
+    // Clear both the pending blob and any retained server recording. Branching
+    // here would leave a re-recorded clip's original still attached to the
+    // signal while the recorder shows an empty state.
     onChange(null);
+    onRemoveExisting?.();
     setSeconds(0);
     setState("idle");
   }
@@ -106,25 +207,45 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
   return (
     <div className="audio-recorder">
       {state === "recording" ? (
-        <button className="record-button is-recording" onClick={stop} type="button">
-          <Pause aria-hidden="true" size={18} />
-          Zastaviť · {seconds}s
+        <button
+          aria-label="Zastaviť nahrávanie"
+          className="record-button is-recording"
+          onClick={stop}
+          type="button"
+        >
+          <Pause aria-hidden="true" size={24} />
+          <span>Zastaviť · {seconds}s</span>
         </button>
-      ) : state === "recorded" && audioUrl ? (
+      ) : state === "recorded" && hasRecording ? (
         <div className="recorded-audio">
-          <audio controls src={audioUrl}>
-            <track kind="captions" />
-          </audio>
-          <button aria-label="Nahrať znova" onClick={() => void start()} type="button">
-            <RotateCcw aria-hidden="true" size={17} />
+          {audioUrl ? (
+            <audio controls src={audioUrl}>
+              <track kind="captions" />
+            </audio>
+          ) : (
+            // Attached but not playable (for example a signed-URL failure).
+            // Still offer the controls so it can be replaced or removed.
+            <p className="field-note">Nahrávka je uložená.</p>
+          )}
+          <button
+            aria-label="Nahrať znova"
+            onClick={() => void start()}
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={18} />
           </button>
-          <button aria-label="Odstrániť nahrávku" onClick={remove} type="button">
-            <Trash2 aria-hidden="true" size={17} />
+          <button
+            aria-label="Odstrániť nahrávku"
+            onClick={remove}
+            type="button"
+          >
+            <Trash2 aria-hidden="true" size={18} />
           </button>
         </div>
       ) : (
         <button
-          className="record-button"
+          aria-label="Nahrať feedback"
+          className="record-button record-button--primary"
           disabled={state === "requesting"}
           onClick={() => void start()}
           type="button"
@@ -132,15 +253,16 @@ export function AudioRecorder({ value = null, onChange }: AudioRecorderProps) {
           {state === "requesting" ? (
             <span className="tiny-spinner" />
           ) : (
-            <Mic aria-hidden="true" size={18} />
+            <span className="record-button__icon">
+              <Mic aria-hidden="true" size={28} />
+            </span>
           )}
-          {state === "requesting" ? "Zapínam mikrofón…" : "Nahrať feedback"}
+          <strong>
+            {state === "requesting" ? "Zapínam mikrofón…" : "Nahrať feedback"}
+          </strong>
         </button>
       )}
       {error ? <p className="field-note field-note--error">{error}</p> : null}
-      <span className="sr-only">
-        <Play aria-hidden="true" /> Hlasový feedback
-      </span>
     </div>
   );
 }

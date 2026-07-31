@@ -1,84 +1,166 @@
 "use client";
 
-import { coverageFor } from "@/lib/domain/stats";
+import { formatCredits } from "@/lib/domain/credits";
 import { remainingWallet } from "@/lib/domain/rules";
+import { coverageFor } from "@/lib/domain/stats";
 import type { FestivalSnapshot, Person } from "@/lib/domain/types";
 import {
   ArrowRight,
+  LogOut,
   MessageSquareText,
-  QrCode,
-  WalletCards,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
+import { ParticipantDock } from "./ParticipantDock";
+import { ParticipantFrame } from "./ParticipantFrame";
 import { ProgressMeter } from "./ProgressMeter";
+import { Snackbar } from "./Snackbar";
 
-export function ParticipantHome({
-  person,
-  snapshot,
-}: {
+type ParticipantHomeProps = {
+  mode?: "demo" | "live" | "supabase";
+  notice: string | null;
+  onDismissNotice(): void;
+  onSignOut(): Promise<void> | void;
   person: Person;
   snapshot: FestivalSnapshot;
-}) {
+};
+
+export function ParticipantHome({
+  mode = "live",
+  notice,
+  onDismissNotice,
+  onSignOut,
+  person,
+  snapshot,
+}: ParticipantHomeProps) {
   const coverage = coverageFor(person.id, snapshot);
   const remaining = remainingWallet(person.id, snapshot);
-  const ownTeam = snapshot.teamMembers.some(
+  const signals = snapshot.signals
+    .filter((signal) => signal.investorId === person.id)
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const ownTeamId = snapshot.teamMembers.find(
     (membership) => membership.personId === person.id,
-  );
-  const isOpen = snapshot.event.status === "open";
-  const isReleased = snapshot.event.status === "released";
+  )?.teamId;
+  const ownTeam = snapshot.teams.find((team) => team.id === ownTeamId);
+  const released = snapshot.event.status === "released";
+  const open = snapshot.event.status === "open";
+  const scanLabel =
+    signals.length === 0 ? "Skenovať QR kód" : "Skenovať ďalší tím";
 
   return (
-    <main className="participant-home">
-      <section className="participant-welcome">
-        <p className="eyebrow">{snapshot.event.name}</p>
-        <h1>Ahoj, {person.name}.</h1>
-        <p>
-          {isOpen
-            ? "Vyskúšaj produkt pri stole. Potom naskenuj jeho QR kód a nechaj tímu peniaze aj konkrétny feedback."
-            : isReleased
-              ? "Festival sa skončil. Tímy už majú svoje investície aj menovitý feedback."
-              : "Investovanie je momentálne zatvorené. Tvoje doterajšie odpovede ostávajú uložené."}
-        </p>
-      </section>
-
-      <Link
-        className={`scan-card ${isOpen ? "" : "scan-card--quiet"}`}
-        href={isReleased && ownTeam ? "/results" : isOpen ? "/scan" : "/portfolio"}
-      >
-        <span className="scan-icon">
-          {isReleased && ownTeam ? (
-            <MessageSquareText aria-hidden="true" />
-          ) : isOpen ? (
-            <QrCode aria-hidden="true" />
-          ) : (
-            <WalletCards aria-hidden="true" />
-          )}
-        </span>
-        <span>
-          <small>
-            {isReleased && ownTeam ? "Tvoj tím" : isOpen ? "Ďalší tím" : "Tvoj prehľad"}
-          </small>
+    <ParticipantFrame
+      bottom={
+        <ParticipantDock>
+          <div className="overview-dock">
+            {open ? (
+              <Link className="overview-primary-action" href="/scan">
+                <span>
+                  <small>Ďalší tím</small>
+                  <strong>{scanLabel}</strong>
+                </span>
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            ) : released && ownTeam ? (
+              <Link className="overview-primary-action" href="/results">
+                <span>
+                  <small>Feedback je odomknutý</small>
+                  <strong>Výsledok môjho tímu</strong>
+                </span>
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            ) : null}
+          </div>
+        </ParticipantDock>
+      }
+      mode={mode}
+      person={person}
+      snapshot={snapshot}
+    >
+      <main className="participant-overview">
+        <section className="overview-balance">
+          <p className="panel-kicker">Zostáva ti</p>
           <strong>
-            {isReleased && ownTeam
-              ? "Otvoriť feedback"
-              : isOpen
-                ? "Skenovať QR kód"
-                : "Pozrieť investície"}
+            {formatCredits(remaining, snapshot.event.currency)}
           </strong>
-        </span>
-        <ArrowRight aria-hidden="true" />
-      </Link>
+          <span>
+            z {formatCredits(person.walletBudget, snapshot.event.currency)} na
+            rozdelenie
+          </span>
+        </section>
 
-      <section className="participant-status">
-        <div className="wallet-stat">
-          <span>Zostáva</span>
-          <strong>{snapshot.event.currency}{remaining}</strong>
-          <Link href="/portfolio">
-            <WalletCards aria-hidden="true" size={17} /> Moje investície
+        <ProgressMeter compact coverage={coverage} />
+
+        {released && ownTeam ? (
+          <Link
+            aria-label={`Výsledok môjho tímu ${ownTeam.name}`}
+            className="overview-result-link"
+            href="/results"
+          >
+            <MessageSquareText aria-hidden="true" size={20} />
+            <span>
+              <small>Výsledok môjho tímu</small>
+              <strong>{ownTeam.name}</strong>
+            </span>
+            <ArrowRight aria-hidden="true" size={20} />
           </Link>
-        </div>
-        <ProgressMeter coverage={coverage} />
-      </section>
-    </main>
+        ) : null}
+
+        <section className="overview-investments">
+          <header>
+            <h1>Moje investície</h1>
+            <span>{signals.length}</span>
+          </header>
+          {signals.length === 0 ? (
+            <div className="overview-empty">Zatiaľ nič.</div>
+          ) : (
+            <div className="overview-investment-list">
+              {signals.map((signal) => {
+                const team = snapshot.teams.find(
+                  (candidate) => candidate.id === signal.teamId,
+                );
+                if (!team) return null;
+
+                return (
+                  <Link
+                    aria-label={`Upraviť ${team.name}`}
+                    className="overview-investment"
+                    href={`/t/${encodeURIComponent(team.code)}?from=overview`}
+                    key={signal.id}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="overview-team-mark"
+                      style={{ background: team.color }}
+                    />
+                    <span className="overview-investment-copy">
+                      <strong>{team.name}</strong>
+                      <small>
+                        {signal.feedbackText || "Hlasový feedback"}
+                      </small>
+                    </span>
+                    <b>
+                      {formatCredits(signal.amount, snapshot.event.currency)}
+                    </b>
+                    {open ? <Pencil aria-hidden="true" size={16} /> : null}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <button
+          className="overview-signout"
+          onClick={() => void onSignOut()}
+          type="button"
+        >
+          <LogOut aria-hidden="true" size={15} />
+          Odhlásiť sa
+        </button>
+      </main>
+      {notice ? (
+        <Snackbar message={notice} onDismiss={onDismissNotice} />
+      ) : null}
+    </ParticipantFrame>
   );
 }

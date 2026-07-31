@@ -1,13 +1,16 @@
 "use client";
 
 import { AppShell } from "@/components/brand/AppShell";
+import { ParticipantDock } from "@/components/participant/ParticipantDock";
+import { ParticipantFrame } from "@/components/participant/ParticipantFrame";
 import { SignalForm } from "@/components/participant/SignalForm";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { isOwnTeam } from "@/lib/domain/rules";
+import type { SignalInput } from "@/lib/domain/types";
 import { useFestival } from "@/lib/repository/useFestival";
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 // `record_visit` is an idempotent upsert, so retrying a failed write is safe.
@@ -16,6 +19,8 @@ const VISIT_MAX_ATTEMPTS = 3;
 
 export default function TeamPage() {
   const params = useParams<{ code: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { commands, connection, currentPerson, error, mode, snapshot } =
     useFestival();
   // Keyed by person and team: this route component can be preserved across
@@ -132,29 +137,48 @@ export default function TeamPage() {
 
   if (!team) {
     return (
-      <AppShell mode={mode}>
+      <ParticipantFrame
+        back={{ href: "/scan", label: "Skener" }}
+        mode={mode}
+        person={currentPerson}
+        snapshot={snapshot}
+      >
         <main className="route-message">
           <p className="eyebrow">Kód {code}</p>
           <h1>Tento tím nepoznáme.</h1>
           <Link className="primary-button" href="/scan">Skenovať znova</Link>
         </main>
-      </AppShell>
+      </ParticipantFrame>
     );
   }
 
   if (isOwnTeam(currentPerson.id, team.id, snapshot)) {
     return (
-      <AppShell mode={mode}>
-        <Link className="back-link" href="/scan">
-          <ArrowLeft aria-hidden="true" size={17} /> Skener
-        </Link>
+      <ParticipantFrame
+        back={{ href: "/scan", label: "Skener" }}
+        bottom={
+          <ParticipantDock>
+            <div className="overview-dock">
+              <Link className="overview-primary-action" href="/scan">
+                <span>
+                  <small>Ďalší tím</small>
+                  <strong>Skenovať QR kód</strong>
+                </span>
+                <ArrowRight aria-hidden="true" />
+              </Link>
+            </div>
+          </ParticipantDock>
+        }
+        mode={mode}
+        person={currentPerson}
+        snapshot={snapshot}
+      >
         <main className="route-message own-team-message">
           <p className="eyebrow">{team.name}</p>
           <h1>Toto je tvoj tím.</h1>
-          <p>Do vlastného tímu neinvestuješ. Choď skúsiť ďalší produkt.</p>
-          <Link className="primary-button" href="/scan">Skenovať ďalší QR kód</Link>
+          <p>Do vlastného tímu neinvestuješ.</p>
         </main>
-      </AppShell>
+      </ParticipantFrame>
     );
   }
 
@@ -162,16 +186,43 @@ export default function TeamPage() {
     (signal) =>
       signal.investorId === currentPerson.id && signal.teamId === team.id,
   );
+  const fromOverview = searchParams.get("from") === "overview";
+  const backHref = fromOverview ? "/" : "/scan";
+  const headerBackLabel = fromOverview ? "Prehľad" : "Skener";
+  const formBackLabel = fromOverview ? "Prehľad" : "skener";
+  const investorId = currentPerson.id;
+  const teamId = team.id;
+  const teamCode = team.code;
+
+  async function save(input: SignalInput, audio?: Blob | null) {
+    await commands.upsertSignal(input, audio);
+    // Carry the amount that was just written. The post-write refresh is
+    // allowed to fail, so the overview cannot rely on the snapshot already
+    // holding this signal.
+    router.push(
+      `/?saved=${encodeURIComponent(teamCode)}&amount=${input.amount}`,
+    );
+  }
+
+  async function remove() {
+    await commands.removeSignal(investorId, teamId);
+    router.push(`/?removed=${encodeURIComponent(teamCode)}`);
+  }
 
   return (
-    <AppShell mode={mode}>
-      <Link className="back-link" href="/scan">
-        <ArrowLeft aria-hidden="true" size={17} /> Skener
-      </Link>
+    <ParticipantFrame
+      back={{ href: backHref, label: headerBackLabel }}
+      mode={mode}
+      person={currentPerson}
+      snapshot={snapshot}
+    >
       {snapshot.event.status === "open" ? (
         <SignalForm
+          backHref={backHref}
+          backLabel={formBackLabel}
           existingSignal={existingSignal}
-          onSave={commands.upsertSignal}
+          onDelete={existingSignal ? remove : undefined}
+          onSave={save}
           person={currentPerson}
           snapshot={snapshot}
           team={team}
@@ -180,11 +231,11 @@ export default function TeamPage() {
         <main className="route-message">
           <p className="eyebrow">{team.name}</p>
           <h1>Investovanie je uzavreté.</h1>
-          <Link className="secondary-button" href="/portfolio">
-            <Home aria-hidden="true" size={18} /> Môj prehľad
+          <Link className="secondary-button" href="/">
+            Môj prehľad
           </Link>
         </main>
       )}
-    </AppShell>
+    </ParticipantFrame>
   );
 }

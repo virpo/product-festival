@@ -1,11 +1,12 @@
+import { formatCredits } from "@/lib/domain/credits";
 import type { FestivalSnapshot, Person, Team } from "@/lib/domain/types";
 import { AudioLines, MessageSquareText, WalletCards } from "lucide-react";
 
 const roleLabel = {
   participant: "účastník",
   mentor: "mentor",
-  organizer: "organizátor",
-  observer: "hosť",
+  organizer: "admin",
+  observer: "organizátor",
 } as const;
 
 export function TeamReceipt({
@@ -57,7 +58,7 @@ export function TeamReceipt({
         </div>
         <div className="receipt-total">
           <span>Spolu</span>
-          <strong>{snapshot.event.currency}{total}</strong>
+          <strong>{formatCredits(total, snapshot.event.currency)}</strong>
           <small>{signals.length} feedbackov</small>
         </div>
       </header>
@@ -77,7 +78,9 @@ export function TeamReceipt({
                     <strong>{author?.name ?? "Neznámy človek"}</strong>
                     <span>{author ? roleLabel[author.role] : ""}</span>
                   </div>
-                  <b>{snapshot.event.currency}{signal.amount}</b>
+                  <b>
+                    {formatCredits(signal.amount, snapshot.event.currency)}
+                  </b>
                 </div>
                 {signal.feedbackText ? (
                   <p><MessageSquareText aria-hidden="true" size={17} />{signal.feedbackText}</p>
@@ -87,8 +90,13 @@ export function TeamReceipt({
                     <AudioLines aria-hidden="true" size={17} />
                     <audio controls src={signal.audioUrl}><track kind="captions" /></audio>
                   </div>
+                ) : signal.audioPath ? (
+                  // Signing the recording failed. Say so rather than falling
+                  // through to "investment without a note" — the team would
+                  // never learn that voice feedback exists.
+                  <p><AudioLines aria-hidden="true" size={17} />Hlasový feedback sa nepodarilo načítať. Skús obnoviť stránku.</p>
                 ) : null}
-                {!signal.feedbackText && !signal.audioUrl ? (
+                {!signal.feedbackText && !signal.audioUrl && !signal.audioPath ? (
                   <p><WalletCards aria-hidden="true" size={17} />Investícia bez textovej poznámky</p>
                 ) : null}
               </article>

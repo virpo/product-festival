@@ -56,6 +56,16 @@ export function deriveEventStats(
   now = new Date(),
 ): EventStats {
   const activeCutoff = now.getTime() - 10 * 60 * 1000;
+  const investors = snapshot.people.filter(
+    (person) => person.role !== "organizer",
+  );
+  const investorIds = new Set(investors.map((person) => person.id));
+  const budgetTotal = investors
+    .reduce((total, person) => total + person.walletBudget, 0);
+  const budgetDistributed = snapshot.signals
+    .filter((signal) => investorIds.has(signal.investorId))
+    .reduce((total, signal) => total + signal.amount, 0);
+  const budgetRemaining = Math.max(budgetTotal - budgetDistributed, 0);
   const coverages = snapshot.people.map((person) => ({
     person,
     coverage: coverageFor(person.id, snapshot),
@@ -98,6 +108,17 @@ export function deriveEventStats(
       (total, signal) => total + signal.amount,
       0,
     ),
+    budgetTotal,
+    budgetDistributed,
+    budgetRemaining,
+    // Floor below completion so the wall cannot show a full bar next to a
+    // non-zero "zostáva" amount. 100% means the budget is actually gone.
+    budgetDistributedPercent:
+      budgetTotal === 0
+        ? 0
+        : budgetDistributed >= budgetTotal
+          ? 100
+          : Math.floor((budgetDistributed / budgetTotal) * 100),
     coverageQualifiedPeople: coverages.filter(
       ({ coverage }) => coverage.qualified,
     ).length,

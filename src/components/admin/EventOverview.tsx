@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCredits } from "@/lib/domain/credits";
 import type { EventStats, EventStatus, FestivalEvent } from "@/lib/domain/types";
 import { CheckCircle2, Clock3, Lock, Play, Radio, Unlock } from "lucide-react";
 
@@ -53,7 +54,9 @@ export function EventOverview({
         </article>
         <article>
           <span>Investované</span>
-          <strong>{event.currency}{stats?.totalInvested ?? 0}</strong>
+          <strong>
+            {formatCredits(stats?.totalInvested ?? 0, event.currency)}
+          </strong>
         </article>
       </div>
 

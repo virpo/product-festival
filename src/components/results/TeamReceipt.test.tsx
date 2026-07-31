@@ -26,7 +26,8 @@ describe("TeamReceipt", () => {
     render(<TeamReceipt snapshot={released} team={team} viewer={viewer} />);
 
     expect(screen.getByText("Marek")).toBeInTheDocument();
-    expect(screen.getByText("€25")).toBeInTheDocument();
+    expect(screen.getByText("25🥞")).toBeInTheDocument();
+    expect(screen.queryByText("🥞25")).not.toBeInTheDocument();
     expect(screen.queryByText(/miesto|rank/i)).not.toBeInTheDocument();
   });
 });

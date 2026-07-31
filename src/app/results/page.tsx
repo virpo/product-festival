@@ -1,10 +1,11 @@
 "use client";
 
+import { OrganizerHeader } from "@/components/admin/OrganizerHeader";
 import { AppShell } from "@/components/brand/AppShell";
-import { TeamReceipt } from "@/components/results/TeamReceipt";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
+import { ParticipantFrame } from "@/components/participant/ParticipantFrame";
+import { TeamReceipt } from "@/components/results/TeamReceipt";
 import { useFestival } from "@/lib/repository/useFestival";
-import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -44,11 +45,8 @@ export default function ResultsPage() {
       : ownTeamId;
   const team = snapshot.teams.find((item) => item.id === teamId);
 
-  return (
-    <AppShell mode={mode}>
-      <Link className="back-link" href="/">
-        <ArrowLeft aria-hidden="true" size={17} /> Domov
-      </Link>
+  const content = (
+    <>
       {currentPerson.role === "organizer" ? (
         <label className="receipt-team-picker">
           Tím
@@ -71,6 +69,35 @@ export default function ResultsPage() {
           <p>Organizátor ti ho vie doplniť v administrácii.</p>
         </main>
       )}
-    </AppShell>
+    </>
+  );
+
+  if (currentPerson.role === "organizer") {
+    return (
+      <AppShell
+        header={
+          <OrganizerHeader
+            back={{ href: "/admin", label: "Administrácia" }}
+            eventStatus={snapshot.event.status}
+            name={currentPerson.name}
+            onSignOut={commands.signOut}
+          />
+        }
+        mode={mode}
+      >
+        {content}
+      </AppShell>
+    );
+  }
+
+  return (
+    <ParticipantFrame
+      back={{ href: "/", label: "Prehľad" }}
+      mode={mode}
+      person={currentPerson}
+      snapshot={snapshot}
+    >
+      {content}
+    </ParticipantFrame>
   );
 }

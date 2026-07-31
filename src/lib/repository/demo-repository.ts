@@ -63,6 +63,11 @@ export class DemoFestivalRepository implements FestivalRepository {
   readonly mode = "demo" as const;
   private readonly listeners = new Set<() => void>();
   private readonly channel: BroadcastChannel | null;
+  // Object URLs die with the document that created them, so they cannot live in
+  // the persisted snapshot. Hold them here, keyed by signal id, and overlay them
+  // onto every snapshot read. A URL restored from storage but absent here was
+  // created by an earlier document and is already dead.
+  private readonly audioUrls = new Map<string, string>();
 
   constructor(private readonly storage: StorageLike) {
     this.channel =
@@ -78,7 +83,15 @@ export class DemoFestivalRepository implements FestivalRepository {
 
     if (stored) {
       try {
-        return JSON.parse(stored) as FestivalSnapshot;
+        const snapshot = JSON.parse(stored) as FestivalSnapshot;
+        // Stored snapshots outlive schema changes: a browser holding demo data
+        // from an earlier release carries stats without the newer fields, and
+        // an anonymous wall never writes, so nothing would ever recompute
+        // them. Deriving on read keeps stored data authoritative for wallets
+        // and signals only.
+        this.attachAudioUrls(snapshot);
+        snapshot.stats = deriveEventStats(snapshot);
+        return snapshot;
       } catch {
         this.storage.removeItem(SNAPSHOT_KEY);
       }
@@ -87,6 +100,53 @@ export class DemoFestivalRepository implements FestivalRepository {
     const snapshot = createDemoSnapshot();
     this.storage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
     return snapshot;
+  }
+
+  /**
+   * Replace serialized audio URLs with the live object URL for this document,
+   * or null when none exists. Seeded non-`blob:` URLs are left untouched.
+   *
+   * Membership of the map is not enough to re-attach: another tab sharing this
+   * storage can clear or delete the recording, and only the writing tab updates
+   * its own map. Following `audioPath` keeps a deleted recording from coming
+   * back to life on the released receipt, which renders from `audioUrl` alone.
+   */
+  private attachAudioUrls(snapshot: FestivalSnapshot) {
+    for (const signal of snapshot.signals) {
+      const live = signal.audioPath ? this.audioUrls.get(signal.id) : undefined;
+
+      if (live) {
+        signal.audioUrl = live;
+      } else if (signal.audioUrl?.startsWith("blob:")) {
+        signal.audioUrl = null;
+      }
+    }
+
+    // Release URLs whose signal lost its recording or was removed elsewhere.
+    for (const [signalId, url] of this.audioUrls) {
+      const signal = snapshot.signals.find(
+        (candidate) => candidate.id === signalId,
+      );
+
+      if (!signal?.audioPath) {
+        URL.revokeObjectURL(url);
+        this.audioUrls.delete(signalId);
+      }
+    }
+  }
+
+  private rememberAudioUrl(signalId: string, url: string | null) {
+    const previous = this.audioUrls.get(signalId);
+
+    if (previous && previous !== url) {
+      URL.revokeObjectURL(previous);
+    }
+
+    if (url) {
+      this.audioUrls.set(signalId, url);
+    } else {
+      this.audioUrls.delete(signalId);
+    }
   }
 
   private read(): FestivalSnapshot {
@@ -213,16 +273,43 @@ export class DemoFestivalRepository implements FestivalRepository {
     );
 
     if (existing) {
-      Object.assign(existing, normalized, {
-        audioUrl: audio ? URL.createObjectURL(audio) : existing.audioUrl,
-        updatedAt: now,
-      });
+      // Follow the path, not the presence of a new blob. Keeping the old URL
+      // when `audioPath` is cleared leaves a removed recording playable on the
+      // released receipt, which renders from `audioUrl` alone. The Supabase
+      // adapter deletes the stored object in the same situation.
+      // Prefer this document's object URL, but keep a durable non-`blob:` URL
+      // when there is none, so an amount-only edit cannot strip playback from a
+      // stored or seeded recording.
+      const retained =
+        this.audioUrls.get(existing.id) ??
+        (existing.audioUrl && !existing.audioUrl.startsWith("blob:")
+          ? existing.audioUrl
+          : null);
+      const audioUrl = audio
+        ? URL.createObjectURL(audio)
+        : normalized.audioPath
+          ? retained
+          : null;
+
+      Object.assign(existing, normalized, { audioUrl, updatedAt: now });
       this.write(snapshot);
+
+      // Register (and revoke any superseded URL) only after the snapshot is
+      // persisted. `write()` can throw on a full storage quota, and revoking
+      // first would leave the retained recording referenced but unplayable.
+      // Only object URLs belong in the map; a durable URL needs no revoking and
+      // `attachAudioUrls` already leaves it untouched.
+      this.rememberAudioUrl(
+        existing.id,
+        audioUrl?.startsWith("blob:") ? audioUrl : null,
+      );
+
       return structuredClone(existing);
     }
 
+    const signalId = crypto.randomUUID();
     const signal: Signal = {
-      id: crypto.randomUUID(),
+      id: signalId,
       eventId: snapshot.event.id,
       ...normalized,
       audioUrl: audio ? URL.createObjectURL(audio) : null,
@@ -231,6 +318,7 @@ export class DemoFestivalRepository implements FestivalRepository {
     };
     snapshot.signals.push(signal);
     this.write(snapshot);
+    this.rememberAudioUrl(signalId, signal.audioUrl);
     return structuredClone(signal);
   }
 
@@ -241,11 +329,18 @@ export class DemoFestivalRepository implements FestivalRepository {
       throw new Error("Investovanie je zatvorené.");
     }
 
+    const removed = snapshot.signals.filter(
+      (signal) => signal.investorId === investorId && signal.teamId === teamId,
+    );
     snapshot.signals = snapshot.signals.filter(
       (signal) =>
         !(signal.investorId === investorId && signal.teamId === teamId),
     );
     this.write(snapshot);
+
+    for (const signal of removed) {
+      this.rememberAudioUrl(signal.id, null);
+    }
   }
 
   async saveTeam(input: SaveTeamInput): Promise<Team> {
@@ -337,6 +432,17 @@ export class DemoFestivalRepository implements FestivalRepository {
           1
       ) {
         throw new Error("Posledný organizátor musí zostať organizátorom.");
+      }
+
+      // Mirrors the people_wallet_covers_signals trigger: a wallet may never
+      // drop below what the person has already invested, or the public budget
+      // progress reports more distributed than exists.
+      const committed = snapshot.signals
+        .filter((signal) => signal.investorId === existing.id)
+        .reduce((total, signal) => total + signal.amount, 0);
+
+      if (input.walletBudget < committed) {
+        throw new Error("Rozpočet nemôže byť nižší než už rozdelené kredity.");
       }
 
       validateTeamAssignment(existing.id, input.teamId, snapshot);
@@ -464,6 +570,10 @@ export class DemoFestivalRepository implements FestivalRepository {
   }
 
   async resetDemo(): Promise<void> {
+    for (const url of this.audioUrls.values()) {
+      URL.revokeObjectURL(url);
+    }
+    this.audioUrls.clear();
     this.storage.removeItem(SNAPSHOT_KEY);
     this.storage.removeItem(PERSON_KEY);
     this.ensureSnapshot();
