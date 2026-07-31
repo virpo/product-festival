@@ -9,7 +9,9 @@ The frontend degrades quietly if it runs ahead of the schema: missing
 back to the legacy invested total instead of reporting an error.
 
 - [ ] Apply `202607300001_investment_progress.sql` and
-  `202607310001_wallet_covers_signals.sql` **before** deploying the frontend.
+  `202607310001_wallet_covers_signals.sql`,
+  `202607310002_festival_sparks.sql`, and
+  `202607310003_qualify_festival_sparks.sql` **before** deploying the frontend.
 - [ ] Preflight before pushing. A fresh clone has no project ref (`supabase/.temp/`
   is gitignored), and `db push` replays every migration the remote has no record
   of — including `202607240001`, whose bare `create type` / `create table`
@@ -20,9 +22,10 @@ back to the legacy invested total instead of reporting an error.
   npx supabase migration list
   ```
 
-  Only `202607300001` and `202607310001` may show as pending. If an earlier
-  version shows pending, it is a history gap, not missing schema — reconcile it
-  with `npx supabase migration repair --status applied <version>` rather than
+  Only `202607300001`, `202607310001`, `202607310002`, and `202607310003` may
+  show as pending. If an earlier version shows pending, it is a history gap,
+  not missing schema — reconcile it with
+  `npx supabase migration repair --status applied <version>` rather than
   letting the push replay it. Then `npx supabase db push`.
 - [ ] On an unlinked machine, paste the two files into the SQL editor instead.
 - [ ] `202607310001` sets a 3s `lock_timeout` on purpose, so creating its trigger

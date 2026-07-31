@@ -24,6 +24,10 @@ const festivalSparksMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607310002_festival_sparks.sql",
 );
+const festivalSparksQualificationMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310003_qualify_festival_sparks.sql",
+);
 const walletCoversSignalsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607310001_wallet_covers_signals.sql",
@@ -169,6 +173,20 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("when distributed >= total_budget then 100");
     expect(sql).toContain("floor(100.0 * distributed / total_budget)");
     expect(sql).not.toContain("round(100.0 * distributed / total_budget)");
+  });
+
+  it("qualifies award columns inside the Festival Spark RPC", () => {
+    const sql = readFileSync(
+      festivalSparksQualificationMigrationPath,
+      "utf8",
+    ).toLowerCase();
+
+    expect(sql).toContain("from public.bonus_awards award");
+    expect(sql).toContain("award.achievement = 'team-joins-in'");
+    expect(sql).toContain("award.achievement = 'first-light'");
+    expect(sql).not.toMatch(
+      /from public\.bonus_awards where[^;]*\bachievement\s*=/,
+    );
   });
 
   it("keeps a wallet at or above the credits already committed", () => {
