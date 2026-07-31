@@ -2,6 +2,7 @@ import { createDemoSnapshot } from "@/lib/repository/demo-data";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_PANCAKE_PACKAGE_DRAFTS,
+  MAX_PANCAKE_PACKAGE_PRICE,
   canTeamAffordPackage,
   teamReceivedAmount,
   validatePancakeCatalog,
@@ -30,6 +31,24 @@ describe("pancake market", () => {
         })),
       ),
     ).toThrow("klesať");
+  });
+
+  it("matches the PostgreSQL integer price boundary", () => {
+    const maximum = DEFAULT_PANCAKE_PACKAGE_DRAFTS.map((item) => ({
+      ...item,
+      price:
+        item.position === 1 ? MAX_PANCAKE_PACKAGE_PRICE : item.price,
+    }));
+    const tooLarge = maximum.map((item) => ({
+      ...item,
+      price:
+        item.position === 1 ? MAX_PANCAKE_PACKAGE_PRICE + 1 : item.price,
+    }));
+
+    expect(validatePancakeCatalog(maximum)[0].price).toBe(
+      MAX_PANCAKE_PACKAGE_PRICE,
+    );
+    expect(() => validatePancakeCatalog(tooLarge)).toThrow("2 147 483 647");
   });
 
   it("sums received signals and accepts the exact price boundary", () => {

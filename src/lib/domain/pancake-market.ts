@@ -21,6 +21,8 @@ export const DEFAULT_PANCAKE_PACKAGE_DRAFTS = [
 export const PANCAKE_CATALOG_STALE_MESSAGE =
   "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.";
 
+export const MAX_PANCAKE_PACKAGE_PRICE = 2_147_483_647;
+
 export function validatePancakeCatalog(
   drafts: readonly PancakePackageDraft[],
 ): PancakePackageDraft[] {
@@ -42,6 +44,12 @@ export function validatePancakeCatalog(
     )
   ) {
     throw new Error("Cena musí byť kladné celé číslo.");
+  }
+
+  if (
+    normalized.some((item) => item.price > MAX_PANCAKE_PACKAGE_PRICE)
+  ) {
+    throw new Error("Cena nesmie presiahnuť 2 147 483 647.");
   }
 
   if (

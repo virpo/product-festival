@@ -2,6 +2,7 @@
 
 import { formatCredits } from "@/lib/domain/credits";
 import {
+  MAX_PANCAKE_PACKAGE_PRICE,
   PANCAKE_CATALOG_STALE_MESSAGE,
   teamReceivedAmount,
   validatePancakeCatalog,
@@ -46,6 +47,7 @@ export function PancakeMarketAdmin({
   const persistedSignature = catalogueSignature(persistedDrafts);
   const appliedSignature = useRef(persistedSignature);
   const latestPersistedSignature = useRef(persistedSignature);
+  const latestPersistedDrafts = useRef(persistedDrafts);
   const appliedDrafts = useRef(persistedDrafts);
   const [drafts, setDrafts] = useState(persistedDrafts);
   const [dirty, setDirty] = useState(false);
@@ -59,6 +61,7 @@ export function PancakeMarketAdmin({
 
   useLayoutEffect(() => {
     latestPersistedSignature.current = persistedSignature;
+    latestPersistedDrafts.current = persistedDrafts;
     if (!dirty && appliedSignature.current !== persistedSignature) {
       setDrafts(persistedDrafts);
       appliedDrafts.current = persistedDrafts;
@@ -113,12 +116,24 @@ export function PancakeMarketAdmin({
 
     setSaving(true);
     try {
+      const submittedSignature = catalogueSignature(normalized);
       await onSave(normalized, appliedDrafts.current);
-      appliedSignature.current = latestPersistedSignature.current;
-      appliedDrafts.current = normalized;
-      setDrafts(normalized);
+      const latestSignature = latestPersistedSignature.current;
+      const useLatestPersisted =
+        latestSignature !== appliedSignature.current &&
+        latestSignature !== submittedSignature;
+      const applied = useLatestPersisted
+        ? latestPersistedDrafts.current
+        : normalized;
+      appliedSignature.current = latestSignature;
+      appliedDrafts.current = applied;
+      setDrafts(applied);
       setDirty(false);
-      setMessage("Palacinkové balíčky sú uložené.");
+      setMessage(
+        useLatestPersisted
+          ? "Balíčky boli uložené a potom zmenené iným organizátorom."
+          : "Palacinkové balíčky sú uložené.",
+      );
     } catch (saveError) {
       setError(
         saveError instanceof Error &&
@@ -258,6 +273,7 @@ export function PancakeMarketAdmin({
                     className="field-input"
                     inputMode="numeric"
                     min="1"
+                    max={MAX_PANCAKE_PACKAGE_PRICE}
                     onChange={(event) =>
                       updateDraft(index, { price: Number(event.target.value) })
                     }

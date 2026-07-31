@@ -344,4 +344,32 @@ describe("SupabaseFestivalRepository", () => {
       "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
     );
   });
+
+  it("rejects prices above the PostgreSQL integer range before the RPC", async () => {
+    const { client } = fakeClient();
+    const repository = new SupabaseFestivalRepository(client as never, {
+      eventSlug: "ai-build-week",
+    });
+    const expected = [
+      { name: "Nugát", price: 700, position: 1 },
+      { name: "Orechy", price: 600, position: 2 },
+      { name: "Tvaroh", price: 500, position: 3 },
+      { name: "Mak", price: 400, position: 4 },
+      { name: "Káva", price: 300, position: 5 },
+      { name: "Gaštan", price: 200, position: 6 },
+      { name: "Bryndza", price: 100, position: 7 },
+    ];
+    const tooLarge = expected.map((item) => ({
+      ...item,
+      price: item.position === 1 ? 2_147_483_648 : item.price,
+    }));
+
+    await expect(
+      repository.savePancakeCatalog(tooLarge, expected),
+    ).rejects.toThrow("2 147 483 647");
+    expect(client.rpc).not.toHaveBeenCalledWith(
+      "save_pancake_catalog",
+      expect.anything(),
+    );
+  });
 });

@@ -191,6 +191,67 @@ describe("DemoFestivalRepository", () => {
     );
   });
 
+  it("rechecks the catalogue after acquiring the cross-tab lock", async () => {
+    const storage = memoryStorage();
+    const repo = new DemoFestivalRepository(storage);
+    await repo.claimPerson("ADMIN");
+    const snapshot = await repo.getSnapshot();
+    const original = snapshot.pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const staleSave = original.map((item) => ({
+      ...item,
+      name: item.position === 1 ? "Starý nugát" : item.name,
+    }));
+    snapshot.pancakePackages[0].name = "Novší nugát";
+    const request = vi.fn(
+      async (
+        _name: string,
+        callback: () => unknown | Promise<unknown>,
+      ) => {
+        storage.setItem(
+          "product-festival:demo:v1",
+          JSON.stringify(snapshot),
+        );
+        return callback();
+      },
+    );
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: { request },
+    });
+
+    try {
+      await expect(
+        repo.savePancakeCatalog(staleSave, original),
+      ).rejects.toThrow(
+        "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+      );
+      expect(request).toHaveBeenCalledOnce();
+    } finally {
+      Object.defineProperty(navigator, "locks", {
+        configurable: true,
+        value: undefined,
+      });
+    }
+  });
+
+  it("rejects prices above the PostgreSQL integer range", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const tooLarge = original.map((item) => ({
+      ...item,
+      price: item.position === 1 ? 2_147_483_648 : item.price,
+    }));
+
+    await expect(
+      repo.savePancakeCatalog(tooLarge, original),
+    ).rejects.toThrow("2 147 483 647");
+  });
+
   it("keeps one replaceable affordable selection for the member's team", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     await repo.claimPerson("ADMIN");
