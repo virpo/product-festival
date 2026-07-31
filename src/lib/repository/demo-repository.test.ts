@@ -275,6 +275,76 @@ describe("DemoFestivalRepository", () => {
     expect(removed.audioUrl).toBeNull();
   });
 
+  it("keeps a new recording playable across the post-save refresh", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+
+    await repo.upsertSignal(
+      {
+        investorId: person.id,
+        teamId: team.id,
+        amount: 5,
+        feedbackText: "",
+        audioPath: "pending-recording",
+      },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+
+    // Every command refreshes through getSnapshot, so the URL has to survive a
+    // read — not just the value upsertSignal returned.
+    const readBack = (await repo.getSnapshot()).signals.find(
+      (signal) =>
+        signal.investorId === person.id && signal.teamId === team.id,
+    )!;
+
+    expect(readBack.audioUrl).toBeTruthy();
+    expect(readBack.audioPath).toBeTruthy();
+  });
+
+  it("drops a recording url left behind by an earlier document", async () => {
+    const storage = memoryStorage();
+    const first = new DemoFestivalRepository(storage);
+    const person = await first.claimPerson("PETER");
+    const snapshot = await first.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    await first.upsertSignal(
+      {
+        investorId: person.id,
+        teamId: team.id,
+        amount: 5,
+        feedbackText: "",
+        audioPath: "pending-recording",
+      },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+
+    // A new document: the persisted blob: URL no longer resolves.
+    const reloaded = new DemoFestivalRepository(storage);
+    const signal = (await reloaded.getSnapshot()).signals.find(
+      (candidate) =>
+        candidate.investorId === person.id && candidate.teamId === team.id,
+    )!;
+
+    expect(signal.audioUrl).toBeNull();
+    expect(signal.audioPath).toBeTruthy();
+  });
+
   it("re-derives stats for a snapshot stored by an earlier release", async () => {
     const storage = memoryStorage();
     const seeded = await new DemoFestivalRepository(storage).getSnapshot();
