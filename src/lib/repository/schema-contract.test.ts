@@ -22,7 +22,7 @@ const investmentProgressMigrationPath = join(
 );
 const festivalSparksMigrationPath = join(
   process.cwd(),
-  "supabase/migrations/202607310001_festival_sparks.sql",
+  "supabase/migrations/202607310002_festival_sparks.sql",
 );
 const walletCoversSignalsMigrationPath = join(
   process.cwd(),
@@ -163,6 +163,12 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("new_awards");
     expect(sql).toContain("revoke all on function public.save_signal");
     expect(sql).not.toContain("alter publication supabase_realtime add table public.bonus_awards");
+    expect(sql).toContain("create or replace function public.enforce_wallet_covers_signals");
+    expect(sql).toContain("from public.bonus_awards award");
+    expect(sql).toContain("award.person_id = new.id");
+    expect(sql).toContain("when distributed >= total_budget then 100");
+    expect(sql).toContain("floor(100.0 * distributed / total_budget)");
+    expect(sql).not.toContain("round(100.0 * distributed / total_budget)");
   });
 
   it("keeps a wallet at or above the credits already committed", () => {

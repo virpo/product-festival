@@ -94,7 +94,7 @@ export class DemoFestivalRepository implements FestivalRepository {
         // them. Deriving on read keeps stored data authoritative for wallets
         // and signals only.
         this.attachAudioUrls(snapshot);
-        snapshot.stats = deriveEventStats(snapshot);
+        snapshot.stats = deriveEventStats(snapshot, new Date(), this.readAwards());
         return snapshot;
       } catch {
         this.storage.removeItem(SNAPSHOT_KEY);

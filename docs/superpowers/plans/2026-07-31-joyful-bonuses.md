@@ -67,7 +67,7 @@
 ### Task 3: Add atomic Supabase award ledger and RPC behavior
 
 **Files:**
-- Create: `supabase/migrations/202607310001_festival_sparks.sql`
+- Create: `supabase/migrations/202607310002_festival_sparks.sql`
 - Modify: `src/lib/repository/supabase-repository.ts`
 - Modify: `src/lib/repository/supabase-repository.test.ts`
 - Modify: `src/lib/repository/schema-contract.test.ts`

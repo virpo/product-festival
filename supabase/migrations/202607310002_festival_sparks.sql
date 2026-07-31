@@ -13,6 +13,39 @@ create table public.bonus_awards (
     )
   )
 );
+-- Bonus awards are part of the wallet available for future organizer edits.
+create or replace function public.enforce_wallet_covers_signals()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  committed integer;
+begin
+  if new.wallet_budget = old.wallet_budget then
+    return new;
+  end if;
+
+  select coalesce(sum(s.amount), 0)::integer
+  into committed
+  from public.signals s
+  where s.event_id = new.event_id
+    and s.investor_id = new.id;
+
+  committed := committed + coalesce((
+    select sum(award.amount)::integer
+    from public.bonus_awards award
+    where award.event_id = new.event_id
+      and award.person_id = new.id
+  ), 0);
+
+  if new.wallet_budget < committed then
+    raise exception 'wallet_below_committed_signals';
+  end if;
+
+  return new;
+end;
+$$;
 
 create unique index bonus_awards_once_per_person
   on public.bonus_awards (event_id, person_id, achievement)
@@ -54,7 +87,7 @@ begin
   set budget_total = total_budget,
       budget_distributed = distributed,
       budget_remaining = greatest(total_budget - distributed, 0),
-      budget_distributed_percent = case when total_budget = 0 then 0 else least(100, round(100.0 * distributed / total_budget)::integer) end,
+      budget_distributed_percent = case when total_budget = 0 then 0 when distributed >= total_budget then 100 else floor(100.0 * distributed / total_budget)::integer end,
       updated_at = now()
   where event_id = target_event_id;
   return coalesce(new, old);
@@ -88,7 +121,7 @@ begin
   set budget_total = total_budget,
       budget_distributed = distributed,
       budget_remaining = greatest(total_budget - distributed, 0),
-      budget_distributed_percent = case when total_budget = 0 then 0 else least(100, round(100.0 * distributed / total_budget)::integer) end,
+      budget_distributed_percent = case when total_budget = 0 then 0 when distributed >= total_budget then 100 else floor(100.0 * distributed / total_budget)::integer end,
       updated_at = now()
   where event_id = target_event_id;
 end;

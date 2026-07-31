@@ -280,7 +280,7 @@ describe("DemoFestivalRepository", () => {
       },
       new Blob(["recording"], { type: "audio/webm" }),
     );
-    expect(withAudio.audioUrl).toBeTruthy();
+    expect(withAudio.signal.audioUrl).toBeTruthy();
 
     const removed = await repo.upsertSignal({
       investorId: person.id,
@@ -290,8 +290,8 @@ describe("DemoFestivalRepository", () => {
       audioPath: null,
     });
 
-    expect(removed.audioPath).toBeNull();
-    expect(removed.audioUrl).toBeNull();
+    expect(removed.signal.audioPath).toBeNull();
+    expect(removed.signal.audioUrl).toBeNull();
   });
 
   it("keeps a new recording playable across the post-save refresh", async () => {
@@ -425,7 +425,7 @@ describe("DemoFestivalRepository", () => {
     const stored = JSON.parse(
       storage.getItem("product-festival:demo:v1")!,
     ) as typeof snapshot;
-    stored.signals.find((s) => s.id === created.id)!.audioUrl =
+    stored.signals.find((s) => s.id === created.signal.id)!.audioUrl =
       "https://example.com/recording.webm";
     storage.setItem("product-festival:demo:v1", JSON.stringify(stored));
 
@@ -439,7 +439,7 @@ describe("DemoFestivalRepository", () => {
     });
 
     const signal = (await repo.getSnapshot()).signals.find(
-      (candidate) => candidate.id === created.id,
+      (candidate) => candidate.id === created.signal.id,
     )!;
     expect(signal.audioUrl).toBe("https://example.com/recording.webm");
   });

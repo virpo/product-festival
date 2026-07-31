@@ -8,7 +8,7 @@ export function BonusReveal({ awards, currency, onContinue }: { awards: BonusRec
 
   useEffect(() => {
     const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const delay = reducedMotion ? 0 : 450 + Math.floor(Math.random() * 650);
+    const delay = reducedMotion ? 0 : 450 + Math.floor(Math.random() * 400);
     const timer = window.setTimeout(() => setRevealed(true), delay);
     return () => window.clearTimeout(timer);
   }, []);
