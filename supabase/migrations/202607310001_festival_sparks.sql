@@ -130,9 +130,7 @@ declare
   available integer;
   new_awards jsonb := '[]'::jsonb;
   own_team_ids uuid[];
-  foreign_team_count integer;
   explored_team_count integer;
-  active_foreign_team_count integer;
   minimum_reviews integer;
   candidate_reviews integer;
   achievement text;
@@ -198,14 +196,29 @@ begin
     end if;
 
     select count(distinct s.team_id)::integer into explored_team_count from public.signals s where s.event_id = signal_event_id and s.investor_id = investor_row.id;
-    select count(*)::integer into active_foreign_team_count from public.teams t where t.event_id = signal_event_id and t.archived = false and not exists (select 1 from public.team_members tm where tm.team_id = t.id and tm.person_id = investor_row.id);
     if explored_team_count >= 3 then
       achievement := 'curious-explorer'; award_amount := 5; award_title := 'Zvedavý objaviteľ!'; award_message := 'Pozrel/a si sa na tri rôzne projekty.';
       insert into public.bonus_awards(event_id, person_id, achievement, amount) values (signal_event_id, investor_row.id, achievement, award_amount) on conflict do nothing;
       if found then new_awards := new_awards || jsonb_build_object('achievement', achievement, 'amount', award_amount, 'title', award_title, 'message', award_message); end if;
     end if;
-    select count(distinct s.team_id)::integer into foreign_team_count from public.signals s where s.event_id = signal_event_id and s.investor_id = investor_row.id and not exists (select 1 from public.team_members tm where tm.team_id = s.team_id and tm.person_id = investor_row.id);
-    if foreign_team_count = active_foreign_team_count and active_foreign_team_count > 0 then
+    if not exists (
+      select 1
+      from public.teams t
+      where t.event_id = signal_event_id
+        and t.archived = false
+        and not exists (
+          select 1
+          from public.team_members tm
+          where tm.team_id = t.id and tm.person_id = investor_row.id
+        )
+        and not exists (
+          select 1
+          from public.signals s
+          where s.event_id = signal_event_id
+            and s.investor_id = investor_row.id
+            and s.team_id = t.id
+        )
+    ) then
       achievement := 'festival-sweep'; award_amount := 20; award_title := 'Festivalová výprava!'; award_message := 'Dal/a si šancu každému cudziemu tímu.';
       insert into public.bonus_awards(event_id, person_id, achievement, amount) values (signal_event_id, investor_row.id, achievement, award_amount) on conflict do nothing;
       if found then new_awards := new_awards || jsonb_build_object('achievement', achievement, 'amount', award_amount, 'title', award_title, 'message', award_message); end if;
