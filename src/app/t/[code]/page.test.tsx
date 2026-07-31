@@ -53,10 +53,10 @@ describe("TeamPage participant flow", () => {
     render(<TeamPage />);
 
     await user.type(
-      screen.getByLabelText("Napísaný feedback"),
+      screen.getByLabelText("Napísaná spätná väzba"),
       "Veľmi jasné.",
     );
-    await user.click(screen.getByRole("button", { name: "Poslať feedback" }));
+    await user.click(screen.getByRole("button", { name: "Poslať spätnú väzbu" }));
 
     await waitFor(() => expect(mocks.upsertSignal).toHaveBeenCalledOnce());
     // The amount travels with the redirect so the overview can confirm the

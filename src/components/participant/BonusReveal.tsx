@@ -28,7 +28,7 @@ export function BonusReveal({ awards, currency, onContinue }: { awards: BonusRec
       <div className="bonus-reveal__spark" aria-hidden="true">✦</div>
       <p className="eyebrow">Festivalová iskra</p>
       <h1>+{total} {currency}</h1>
-      <p className="bonus-reveal__message">Tvoj feedback práve urobil festival o kúsok lepším.</p>
+      <p className="bonus-reveal__message">Tvoja spätná väzba práve posunula festival o kúsok ďalej.</p>
       <ul className="bonus-reveal__list">
         {awards.map((award) => (
           <li key={award.achievement}>
@@ -38,7 +38,6 @@ export function BonusReveal({ awards, currency, onContinue }: { awards: BonusRec
           </li>
         ))}
       </ul>
-      <p className="bonus-reveal__handoff">Ukáž túto obrazovku pri Spark stanovišti a vyzdvihni si nálepku.</p>
       <button className="primary-button" type="button" onClick={onContinue}>Pokračovať</button>
     </section>
   );

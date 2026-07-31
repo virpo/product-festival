@@ -21,13 +21,13 @@ export type BonusCalculationInput = {
 };
 
 const DETAILS: Record<BonusAchievement, { amount: number; title: string; message: string }> = {
-  "first-spark": { amount: 5, title: "Prvá iskra!", message: "Tvoj prvý feedback rozžiaril festival." },
+  "first-spark": { amount: 5, title: "Prvá iskra!", message: "Tvoja prvá spätná väzba rozžiarila festival." },
   "team-joins-in": { amount: 5, title: "Tím sa pripája!", message: "Tvoj tím práve poslal svoju prvú iskru." },
-  "first-light": { amount: 10, title: "Prvé svetlo!", message: "Tvoj feedback otvoril tomuto tímu nový pohľad." },
-  "helpful-spotlight": { amount: 10, title: "Pomoc v centre pozornosti!", message: "Tvoj pohľad ide tímu, ktorý ho práve najviac potrebuje." },
-  "curious-explorer": { amount: 5, title: "Zvedavý objaviteľ!", message: "Pozrel/a si sa na tri rôzne projekty." },
-  "festival-sweep": { amount: 20, title: "Festivalová výprava!", message: "Dal/a si šancu každému cudziemu tímu." },
-  "voice-of-the-festival": { amount: 5, title: "Hlas festivalu!", message: "Tvoja prvá hlasová poznámka priniesla feedbacku nový rozmer." },
+  "first-light": { amount: 10, title: "Prvé svetlo!", message: "Tvoja spätná väzba otvorila tímu nový pohľad." },
+  "helpful-spotlight": { amount: 10, title: "Pomáhaš tímu v núdzi!", message: "Tvoja spätná väzba pomáha tímu, ktorý ju teraz najviac potrebuje." },
+  "curious-explorer": { amount: 5, title: "Zvedavý objaviteľ!", message: "Tri tímy už poznáš zblízka." },
+  "festival-sweep": { amount: 20, title: "Festivalová výprava!", message: "Tvoja spätná väzba sa dostala ku každému tímu." },
+  "voice-of-the-festival": { amount: 5, title: "Hlas festivalu!", message: "Tvoja prvá hlasová poznámka dala spätnej väzbe nový rozmer." },
 };
 
 function isMidpoint(event: FestivalEvent, now: string): boolean {

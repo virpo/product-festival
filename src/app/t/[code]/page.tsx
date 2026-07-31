@@ -148,8 +148,8 @@ export default function TeamPage() {
       >
         <main className="route-message">
           <p className="eyebrow">Kód {code}</p>
-          <h1>Tento tím nepoznáme.</h1>
-          <Link className="primary-button" href="/scan">Skenovať znova</Link>
+          <h1>Tento tím sme nenašli.</h1>
+          <Link className="primary-button" href="/scan">Naskenovať znova</Link>
         </main>
       </ParticipantFrame>
     );
@@ -180,7 +180,7 @@ export default function TeamPage() {
         <main className="route-message own-team-message">
           <p className="eyebrow">{team.name}</p>
           <h1>Toto je tvoj tím.</h1>
-          <p>Do vlastného tímu neinvestuješ.</p>
+          <p>Do vlastného tímu investovať nemôžeš.</p>
         </main>
       </ParticipantFrame>
     );

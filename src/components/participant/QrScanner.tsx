@@ -66,7 +66,7 @@ export function QrScanner() {
       } catch {
         if (active) {
           setState("error");
-          setError("Kamera sa nedá použiť. Zadaj kód tímu.");
+          setError("Kameru sa nepodarilo spustiť. Zadaj kód tímu.");
         }
       }
     }
@@ -104,7 +104,7 @@ export function QrScanner() {
             {state === "starting" ? (
               <div className="scanner-placeholder">
                 <Camera aria-hidden="true" />
-                <span>Zapínam kameru…</span>
+                <span>Spúšťam kameru…</span>
               </div>
             ) : null}
             <span className="scan-corner scan-corner--a" />

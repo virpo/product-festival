@@ -15,7 +15,7 @@ export default function ScanPage() {
       <AppShell mode={mode}>
         <InitialLoadState
           error={error}
-          label="Zapínam skener…"
+          label="Spúšťam skener…"
           onRetry={commands.refresh}
         />
       </AppShell>

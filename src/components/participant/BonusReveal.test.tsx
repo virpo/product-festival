@@ -14,7 +14,6 @@ describe("BonusReveal", () => {
     render(<BonusReveal awards={awards} currency="🥞" onContinue={onContinue} />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "+15 🥞" })).toBeInTheDocument());
     expect(screen.getByText("Prvá iskra!")).toBeInTheDocument();
-    expect(screen.getByText(/Spark stanovišti/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Pokračovať" }));
     expect(onContinue).toHaveBeenCalledOnce();
   });

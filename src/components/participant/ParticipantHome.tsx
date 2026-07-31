@@ -65,7 +65,7 @@ export function ParticipantHome({
             ) : released && ownTeam ? (
               <Link className="overview-primary-action" href="/results">
                 <span>
-                  <small>Feedback je odomknutý</small>
+                  <small>Spätná väzba je dostupná</small>
                   <strong>Výsledok môjho tímu</strong>
                 </span>
                 <ArrowRight aria-hidden="true" />
@@ -138,7 +138,7 @@ export function ParticipantHome({
                     <span className="overview-investment-copy">
                       <strong>{team.name}</strong>
                       <small>
-                        {signal.feedbackText || "Hlasový feedback"}
+                        {signal.feedbackText || "Hlasová poznámka"}
                       </small>
                     </span>
                     <b>

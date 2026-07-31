@@ -21,7 +21,7 @@ export default function ResultsPage() {
       <AppShell mode={mode}>
         <InitialLoadState
           error={error}
-          label="Načítavam feedback…"
+          label="Načítavam spätnú väzbu…"
           onRetry={commands.refresh}
         />
       </AppShell>

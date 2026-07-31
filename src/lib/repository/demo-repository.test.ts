@@ -99,7 +99,7 @@ describe("DemoFestivalRepository", () => {
         accessCode: mentor.accessCode,
         teamId: snapshot.teams[2].id,
       }),
-    ).rejects.toThrow("Tím už nemožno zmeniť po odoslaní feedbacku.");
+    ).rejects.toThrow("Tím už nemožno zmeniť po odoslaní spätnej väzby.");
   });
 
   it("does not remove or demote the current organizer", async () => {

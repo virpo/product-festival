@@ -95,7 +95,7 @@ export function validateTeamAssignment(
     snapshot.signals.some((signal) => signal.investorId === personId)
   ) {
     throw new FestivalRuleError(
-      "Tím už nemožno zmeniť po odoslaní feedbacku.",
+      "Tím už nemožno zmeniť po odoslaní spätnej väzby.",
     );
   }
 }
@@ -140,7 +140,7 @@ export function validateSignal(
   const hasAudio = Boolean(input.audioPath?.trim());
 
   if (!hasText && !hasAudio) {
-    throw new FestivalRuleError("Pridaj feedback alebo hlasovú poznámku.");
+    throw new FestivalRuleError("Pridaj text alebo hlasovú poznámku.");
   }
 
   const existing = snapshot.signals.find(

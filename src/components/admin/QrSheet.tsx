@@ -75,7 +75,7 @@ export function QrSheet({
                   value={url}
                 />
               </div>
-              <strong>Naskenuj. Vyskúšaj. Daj feedback.</strong>
+              <strong>Naskenuj. Vyskúšaj. Daj spätnú väzbu.</strong>
               <code>{team.code}</code>
               <small>{url}</small>
               <button className="qr-download" onClick={() => download(team)} type="button">
