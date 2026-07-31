@@ -300,4 +300,19 @@ describe("SupabaseFestivalRepository", () => {
       target_package_id: "package-7",
     });
   });
+
+  it("maps a protected package selector removal to a useful error", async () => {
+    const { client } = fakeClient();
+    client.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "person_with_pancake_selection_cannot_be_removed" },
+    });
+    const repository = new SupabaseFestivalRepository(client as never, {
+      eventSlug: "ai-build-week",
+    });
+
+    await expect(repository.removePerson("person-1")).rejects.toThrow(
+      "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
+    );
+  });
 });

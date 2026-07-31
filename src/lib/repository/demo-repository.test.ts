@@ -197,6 +197,34 @@ describe("DemoFestivalRepository", () => {
     ).rejects.toThrow("Tím nemá dosť palaciniek.");
   });
 
+  it("does not remove the person who chose the team package", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const configured = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({
+        name,
+        position,
+        price: position === 7 ? 20 : price,
+      }),
+    );
+    await repo.savePancakeCatalog(configured);
+    await repo.advanceEvent("locked");
+    await repo.advanceEvent("released");
+    await repo.signOut();
+    const ada = await repo.claimPerson("ADA");
+    await repo.selectPancakePackage(
+      (await repo.getSnapshot()).pancakePackages.find(
+        (item) => item.position === 7,
+      )!.id,
+    );
+    await repo.signOut();
+    await repo.claimPerson("ADMIN");
+
+    await expect(repo.removePerson(ada.id)).rejects.toThrow(
+      "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
+    );
+  });
+
   it("requires a team and restores market defaults on reset", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     await repo.claimPerson("ADMIN");

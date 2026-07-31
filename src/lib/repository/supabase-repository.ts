@@ -71,6 +71,8 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   person_not_found: "Človek sa nenašiel.",
   person_with_feedback_cannot_be_removed:
     "Človeka, ktorý už poslal feedback, nemôžeš odstrániť.",
+  person_with_pancake_selection_cannot_be_removed:
+    "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
   team_not_available: "Tím nie je dostupný.",
   unknown_access_code: "Tento prístupový kód neexistuje.",
   visits_closed: "Návštevy sa dajú zapisovať iba počas otvoreného eventu.",

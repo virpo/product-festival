@@ -295,6 +295,73 @@ begin
 end;
 $$;
 
+create or replace function public.remove_person(target_person_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_person public.people%rowtype;
+  event_row public.events%rowtype;
+  caller_person_id uuid;
+begin
+  select *
+  into target_person
+  from public.people
+  where id = target_person_id;
+
+  if target_person.id is null then
+    return;
+  end if;
+
+  if not public.is_organizer(target_person.event_id) then
+    raise exception 'organizer_access_required';
+  end if;
+
+  select *
+  into event_row
+  from public.events
+  where id = target_person.event_id
+  for update;
+
+  caller_person_id := public.current_person_id(target_person.event_id);
+
+  if target_person.id = caller_person_id then
+    raise exception 'current_organizer_cannot_be_removed';
+  end if;
+
+  if target_person.role = 'organizer'
+    and (
+      select count(*)
+      from public.people
+      where event_id = target_person.event_id
+        and role = 'organizer'
+    ) <= 1 then
+    raise exception 'last_organizer_cannot_be_removed';
+  end if;
+
+  if exists (
+    select 1
+    from public.signals
+    where investor_id = target_person.id
+  ) then
+    raise exception 'person_with_feedback_cannot_be_removed';
+  end if;
+
+  if exists (
+    select 1
+    from public.team_pancake_selections
+    where selected_by = target_person.id
+  ) then
+    raise exception 'person_with_pancake_selection_cannot_be_removed';
+  end if;
+
+  delete from public.people
+  where id = target_person.id;
+end;
+$$;
+
 revoke all on function public.seed_pancake_catalog(uuid) from public;
 revoke all on function public.save_pancake_catalog(uuid, jsonb) from public;
 revoke all on function public.select_pancake_package(uuid, uuid) from public;

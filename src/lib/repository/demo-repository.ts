@@ -624,6 +624,16 @@ export class DemoFestivalRepository implements FestivalRepository {
       throw new Error("Človeka so spätnou väzbou už nemožno odstrániť.");
     }
 
+    if (
+      snapshot.pancakeSelections.some(
+        (selection) => selection.selectedBy === personId,
+      )
+    ) {
+      throw new Error(
+        "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
+      );
+    }
+
     snapshot.people = snapshot.people.filter((person) => person.id !== personId);
     snapshot.teamMembers = snapshot.teamMembers.filter(
       (membership) => membership.personId !== personId,
