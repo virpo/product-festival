@@ -31,11 +31,14 @@ type AudioRecorderProps = {
    */
   onBusyChange?(busy: boolean): void;
   /**
-   * Bump to abandon a microphone request that is still pending. Submitting or
-   * deleting navigates away, and a permission granted after that would
-   * otherwise start a capture nobody can reach.
+   * Reads a counter the parent bumps to abandon a microphone request that is
+   * still pending. Submitting or deleting navigates away, and a permission
+   * granted after that would otherwise start a capture nobody can reach. It is
+   * a getter rather than a prop value so the parent can bump it synchronously —
+   * a value mirrored through an effect would still be stale for one task, which
+   * is precisely the window this guard exists to close.
    */
-  cancelToken?: number;
+  readCancelToken?(): number;
   onRemoveExisting?(): void;
 };
 
@@ -43,7 +46,7 @@ export function AudioRecorder({
   existingUrl = null,
   hasExisting = false,
   value = null,
-  cancelToken = 0,
+  readCancelToken,
   onChange,
   onBusyChange,
   onRemoveExisting,
@@ -58,9 +61,7 @@ export function AudioRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const mountedRef = useRef(true);
-  // Mirrors `cancelToken` so an in-flight getUserMedia call can tell whether it
-  // was abandoned while the permission prompt was open.
-  const cancelTokenRef = useRef(cancelToken);
+
   const objectUrl = useMemo(
     () => (value ? URL.createObjectURL(value) : null),
     [value],
@@ -77,10 +78,6 @@ export function AudioRecorder({
   useEffect(() => {
     busyRef.current?.(state === "recording");
   }, [state]);
-
-  useEffect(() => {
-    cancelTokenRef.current = cancelToken;
-  }, [cancelToken]);
 
   useEffect(() => {
     if (state !== "recording") {
@@ -138,7 +135,7 @@ export function AudioRecorder({
     setError("");
     setSeconds(0);
     chunksRef.current = [];
-    const requestedAt = cancelTokenRef.current;
+    const requestedAt = readCancelToken?.() ?? 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -154,7 +151,7 @@ export function AudioRecorder({
         return;
       }
 
-      if (cancelTokenRef.current !== requestedAt) {
+      if ((readCancelToken?.() ?? 0) !== requestedAt) {
         releaseStream();
         setState(hasRecording ? "recorded" : "idle");
         return;
@@ -185,7 +182,7 @@ export function AudioRecorder({
       if (!mountedRef.current) {
         return;
       }
-      if (cancelTokenRef.current !== requestedAt) {
+      if ((readCancelToken?.() ?? 0) !== requestedAt) {
         setState(hasRecording ? "recorded" : "idle");
         return;
       }

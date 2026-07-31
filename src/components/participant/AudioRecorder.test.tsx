@@ -112,13 +112,17 @@ describe("AudioRecorder microphone lifecycle", () => {
       },
     );
 
-    const { rerender } = render(
-      <AudioRecorder cancelToken={0} onChange={vi.fn()} />,
+    // The parent bumps this synchronously when a save or delete begins.
+    const token = { current: 0 };
+    render(
+      <AudioRecorder
+        onChange={vi.fn()}
+        readCancelToken={() => token.current}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
 
-    // Saving or deleting bumps the token while the prompt is still open.
-    rerender(<AudioRecorder cancelToken={1} onChange={vi.fn()} />);
+    token.current += 1;
     await act(async () => {
       grant();
     });
