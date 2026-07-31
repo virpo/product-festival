@@ -21,6 +21,7 @@ set search_path = public
 as $$
 declare
   committed integer;
+  earned integer;
 begin
   if new.wallet_budget = old.wallet_budget then
     return new;
@@ -31,15 +32,13 @@ begin
   from public.signals s
   where s.event_id = new.event_id
     and s.investor_id = new.id;
+  select coalesce(sum(award.amount), 0)::integer
+  into earned
+  from public.bonus_awards award
+  where award.event_id = new.event_id
+    and award.person_id = new.id;
 
-  committed := committed + coalesce((
-    select sum(award.amount)::integer
-    from public.bonus_awards award
-    where award.event_id = new.event_id
-      and award.person_id = new.id
-  ), 0);
-
-  if new.wallet_budget < committed then
+  if new.wallet_budget + earned < committed then
     raise exception 'wallet_below_committed_signals';
   end if;
 
