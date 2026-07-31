@@ -4,7 +4,7 @@ create table public.bonus_awards (
   person_id uuid not null references public.people(id) on delete cascade,
   achievement text not null,
   amount integer not null check (amount > 0),
-  team_id uuid references public.teams(id) on delete cascade,
+  team_id uuid references public.teams(id) on delete set null,
   created_at timestamptz not null default now(),
   check (
     achievement in (
