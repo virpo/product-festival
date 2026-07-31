@@ -204,7 +204,9 @@ export default function TeamPage() {
       setSavedAwards(result.awards);
       return;
     }
-    router.push(`/?saved=${encodeURIComponent(teamCode)}`);
+    router.push(
+      `/?saved=${encodeURIComponent(teamCode)}&amount=${input.amount}`,
+    );
   }
 
   async function remove() {

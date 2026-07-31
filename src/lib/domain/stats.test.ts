@@ -131,4 +131,37 @@ describe("festival stats", () => {
       totalInvested: 100,
     });
   });
+
+  it("reports 100% only once the budget is actually gone", () => {
+    function withDistributed(amount: number) {
+      const snapshot = makeSnapshot({
+        signals: [
+          {
+            id: "signal-1",
+            eventId: "event-1",
+            investorId: "person-2",
+            teamId: "team-1",
+            amount,
+            feedbackText: "Solid.",
+            audioPath: null,
+            audioUrl: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      });
+
+      return deriveEventStats(snapshot, new Date(now));
+    }
+
+    const budgetTotal = withDistributed(0).budgetTotal;
+
+    const almost = withDistributed(budgetTotal - 1);
+    expect(almost.budgetRemaining).toBe(1);
+    expect(almost.budgetDistributedPercent).toBe(99);
+
+    const complete = withDistributed(budgetTotal);
+    expect(complete.budgetRemaining).toBe(0);
+    expect(complete.budgetDistributedPercent).toBe(100);
+  });
 });

@@ -59,7 +59,9 @@ describe("TeamPage participant flow", () => {
     await user.click(screen.getByRole("button", { name: "Poslať feedback" }));
 
     await waitFor(() => expect(mocks.upsertSignal).toHaveBeenCalledOnce());
-    expect(mocks.push).toHaveBeenCalledWith("/?saved=LEDGER8");
+    // The amount travels with the redirect so the overview can confirm the
+    // save even when the post-write refresh has not landed yet.
+    expect(mocks.push).toHaveBeenCalledWith("/?saved=LEDGER8&amount=10");
   });
 
   it("returns to the overview after deleting an existing investment", async () => {

@@ -16,6 +16,18 @@ export function PublicWall({
   const countdown = useCountdown(event.locksAt);
   const distributedPercent = stats?.budgetDistributedPercent ?? 0;
   const remainingBudget = stats?.budgetRemaining ?? 0;
+  // A stats row without a budget total is either a pre-migration schema (where
+  // the missing columns map to zero) or an event with nothing to distribute.
+  // Showing "0% · 0 zostáva" on the projector would read as real progress in
+  // both cases, so show nothing instead.
+  const hasBudget = (stats?.budgetTotal ?? 0) > 0;
+  // With a budget, report the same non-organizer pool as the bar above. Without
+  // one — a pre-migration row, where every budget column maps to zero — fall
+  // back to `totalInvested`, which that schema does populate, rather than
+  // stating on the projector that nothing has been invested.
+  const investedCredits = hasBudget
+    ? (stats?.budgetDistributed ?? 0)
+    : (stats?.totalInvested ?? 0);
 
   return (
     <main className={`public-wall public-wall--${event.status}`} data-updated={stats?.updatedAt}>
@@ -53,21 +65,23 @@ export function PublicWall({
         ) : null}
       </section>
 
-      <section className="wall-progress">
-        <div>
-          <div className="wall-progress-copy">
-            <span>Rozdelené z celého rozpočtu</span>
-            <small>
-              <span>{formatCredits(remainingBudget, event.currency)}</span>
-              <span>zostáva</span>
-            </small>
+      {hasBudget ? (
+        <section className="wall-progress">
+          <div>
+            <div className="wall-progress-copy">
+              <span>Rozdelené z celého rozpočtu</span>
+              <small>
+                <span>{formatCredits(remainingBudget, event.currency)}</span>
+                <span>zostáva</span>
+              </small>
+            </div>
+            <strong>{distributedPercent}%</strong>
           </div>
-          <strong>{distributedPercent}%</strong>
-        </div>
-        <div className="wall-progress-track">
-          <span style={{ width: `${distributedPercent}%` }} />
-        </div>
-      </section>
+          <div className="wall-progress-track">
+            <span style={{ width: `${distributedPercent}%` }} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="wall-stats">
         <article>
@@ -82,7 +96,7 @@ export function PublicWall({
         </article>
         <article>
           <WalletCards aria-hidden="true" />
-          <strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong>
+          <strong>{formatCredits(investedCredits, event.currency)}</strong>
           <span>investovaných</span>
         </article>
       </section>

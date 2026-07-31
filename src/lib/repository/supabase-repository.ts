@@ -70,6 +70,8 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   team_not_available: "Tím nie je dostupný.",
   unknown_access_code: "Tento prístupový kód neexistuje.",
   visits_closed: "Návštevy sa dajú zapisovať iba počas otvoreného eventu.",
+  wallet_below_committed_signals:
+    "Rozpočet nemôže byť nižší než už rozdelené kredity.",
 };
 
 function describeError(message: string): string | null {

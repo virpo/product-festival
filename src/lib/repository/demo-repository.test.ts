@@ -203,4 +203,265 @@ describe("DemoFestivalRepository", () => {
     await repo.advanceEvent("released");
     expect((await repo.getSnapshot()).event.resultsReleasedAt).not.toBeNull();
   });
+
+  it("refuses a wallet below what the person already invested", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 40,
+      feedbackText: "Committed.",
+      audioPath: null,
+    });
+
+    const after = await repo.getSnapshot();
+    const committed = after.signals
+      .filter((signal) => signal.investorId === person.id)
+      .reduce((total, signal) => total + signal.amount, 0);
+    // Membership freezes after the first signal, so keep the current team.
+    const ownTeamId =
+      after.teamMembers.find((member) => member.personId === person.id)
+        ?.teamId ?? null;
+
+    await expect(
+      repo.savePerson({
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        walletBudget: committed - 1,
+        accessCode: person.accessCode,
+        teamId: ownTeamId,
+      }),
+    ).rejects.toThrow("Rozpočet nemôže byť nižší než už rozdelené kredity.");
+
+    // Equality is still valid: the wallet is exactly spent.
+    await expect(
+      repo.savePerson({
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        walletBudget: committed,
+        accessCode: person.accessCode,
+        teamId: ownTeamId,
+      }),
+    ).resolves.toMatchObject({ walletBudget: committed });
+  });
+
+  it("clears the audio url when a recording is removed", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+
+    const withAudio = await repo.upsertSignal(
+      {
+        investorId: person.id,
+        teamId: team.id,
+        amount: 5,
+        feedbackText: "",
+        audioPath: "pending-recording",
+      },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+    expect(withAudio.audioUrl).toBeTruthy();
+
+    const removed = await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 5,
+      feedbackText: "Written instead.",
+      audioPath: null,
+    });
+
+    expect(removed.audioPath).toBeNull();
+    expect(removed.audioUrl).toBeNull();
+  });
+
+  it("keeps a new recording playable across the post-save refresh", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("PETER");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+
+    await repo.upsertSignal(
+      {
+        investorId: person.id,
+        teamId: team.id,
+        amount: 5,
+        feedbackText: "",
+        audioPath: "pending-recording",
+      },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+
+    // Every command refreshes through getSnapshot, so the URL has to survive a
+    // read — not just the value upsertSignal returned.
+    const readBack = (await repo.getSnapshot()).signals.find(
+      (signal) =>
+        signal.investorId === person.id && signal.teamId === team.id,
+    )!;
+
+    expect(readBack.audioUrl).toBeTruthy();
+    expect(readBack.audioPath).toBeTruthy();
+  });
+
+  it("drops a recording url left behind by an earlier document", async () => {
+    const storage = memoryStorage();
+    const first = new DemoFestivalRepository(storage);
+    const person = await first.claimPerson("PETER");
+    const snapshot = await first.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    await first.upsertSignal(
+      {
+        investorId: person.id,
+        teamId: team.id,
+        amount: 5,
+        feedbackText: "",
+        audioPath: "pending-recording",
+      },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+
+    // A new document: the persisted blob: URL no longer resolves.
+    const reloaded = new DemoFestivalRepository(storage);
+    const signal = (await reloaded.getSnapshot()).signals.find(
+      (candidate) =>
+        candidate.investorId === person.id && candidate.teamId === team.id,
+    )!;
+
+    expect(signal.audioUrl).toBeNull();
+    expect(signal.audioPath).toBeTruthy();
+  });
+
+  it("does not resurrect a recording another tab removed", async () => {
+    const storage = memoryStorage();
+    const tabA = new DemoFestivalRepository(storage);
+    const tabB = new DemoFestivalRepository(storage);
+    const person = await tabA.claimPerson("PETER");
+    const snapshot = await tabA.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    const base = {
+      investorId: person.id,
+      teamId: team.id,
+      amount: 5,
+      feedbackText: "Written note.",
+    };
+
+    await tabA.upsertSignal(
+      { ...base, audioPath: "pending-recording" },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+    // Tab A holds the live object URL; tab B clears the recording.
+    await tabB.upsertSignal({ ...base, audioPath: null });
+
+    const signal = (await tabA.getSnapshot()).signals.find(
+      (candidate) =>
+        candidate.investorId === person.id && candidate.teamId === team.id,
+    )!;
+
+    expect(signal.audioPath).toBeNull();
+    expect(signal.audioUrl).toBeNull();
+  });
+
+  it("keeps a durable audio url through an amount-only edit", async () => {
+    const storage = memoryStorage();
+    const seed = new DemoFestivalRepository(storage);
+    const person = await seed.claimPerson("PETER");
+    const snapshot = await seed.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    const created = await seed.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 5,
+      feedbackText: "Note.",
+      audioPath: "stored/recording.webm",
+    });
+    // Simulate a stored snapshot whose recording has a durable, non-blob URL.
+    const stored = JSON.parse(
+      storage.getItem("product-festival:demo:v1")!,
+    ) as typeof snapshot;
+    stored.signals.find((s) => s.id === created.id)!.audioUrl =
+      "https://example.com/recording.webm";
+    storage.setItem("product-festival:demo:v1", JSON.stringify(stored));
+
+    const repo = new DemoFestivalRepository(storage);
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 9,
+      feedbackText: "Note.",
+      audioPath: "stored/recording.webm",
+    });
+
+    const signal = (await repo.getSnapshot()).signals.find(
+      (candidate) => candidate.id === created.id,
+    )!;
+    expect(signal.audioUrl).toBe("https://example.com/recording.webm");
+  });
+
+  it("re-derives stats for a snapshot stored by an earlier release", async () => {
+    const storage = memoryStorage();
+    const seeded = await new DemoFestivalRepository(storage).getSnapshot();
+    // An older release persisted stats without the investment-progress fields.
+    const legacyStats = { ...seeded.stats! } as Record<string, unknown>;
+    delete legacyStats.budgetTotal;
+    delete legacyStats.budgetDistributed;
+    delete legacyStats.budgetRemaining;
+    delete legacyStats.budgetDistributedPercent;
+    storage.setItem(
+      "product-festival:demo:v1",
+      JSON.stringify({ ...seeded, stats: legacyStats }),
+    );
+
+    // A projector opens the wall anonymously and never writes.
+    const snapshot = await new DemoFestivalRepository(storage).getSnapshot();
+
+    expect(snapshot.stats?.budgetTotal).toBeGreaterThan(0);
+    expect(snapshot.stats?.budgetRemaining).toBeGreaterThan(0);
+  });
 });

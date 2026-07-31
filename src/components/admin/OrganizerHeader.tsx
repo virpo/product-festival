@@ -15,6 +15,7 @@ type OrganizerHeaderProps = {
     href: string;
     label: string;
   };
+  className?: string;
   eventStatus: EventStatus;
   name: string;
   onSignOut(): Promise<void> | void;
@@ -22,6 +23,7 @@ type OrganizerHeaderProps = {
 
 export function OrganizerHeader({
   back,
+  className,
   eventStatus,
   name,
   onSignOut,
@@ -41,6 +43,7 @@ export function OrganizerHeader({
 
   return (
     <FestivalHeader
+      className={className}
       left={left}
       right={
         <div className="organizer-header__controls">

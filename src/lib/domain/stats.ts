@@ -119,10 +119,14 @@ export function deriveEventStats(
     budgetTotal,
     budgetDistributed,
     budgetRemaining,
+    // Floor below completion so the wall cannot show a full bar next to a
+    // non-zero "zostáva" amount. 100% means the budget is actually gone.
     budgetDistributedPercent:
       budgetTotal === 0
         ? 0
-        : Math.min(100, Math.round((budgetDistributed / budgetTotal) * 100)),
+        : budgetDistributed >= budgetTotal
+          ? 100
+          : Math.floor((budgetDistributed / budgetTotal) * 100),
     coverageQualifiedPeople: coverages.filter(
       ({ coverage }) => coverage.qualified,
     ).length,

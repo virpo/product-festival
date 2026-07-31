@@ -18,7 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useRef, useState, type FormEvent } from "react";
 import { AudioRecorder } from "./AudioRecorder";
 import { ParticipantDock } from "./ParticipantDock";
 
@@ -63,6 +63,16 @@ export function SignalForm({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // The recorded Blob only reaches this form from the recorder's later `stop`
+  // event, so saving mid-recording would persist the previous audio path and
+  // throw the recording away when navigation unmounts the recorder. Deleting
+  // discards the whole signal, so it stays available.
+  const [recording, setRecording] = useState(false);
+  // Bumped when we navigate away, so a microphone request still waiting on the
+  // permission prompt is abandoned instead of capturing into a dead form. A ref
+  // rather than state: the recorder has to observe the bump synchronously.
+  const cancelTokenRef = useRef(0);
+  const readCancelToken = useCallback(() => cancelTokenRef.current, []);
 
   function setSafeAmount(value: number) {
     setAmount(Math.max(0, Math.min(maximum, Number.isFinite(value) ? value : 0)));
@@ -77,6 +87,7 @@ export function SignalForm({
       return;
     }
 
+    cancelTokenRef.current += 1;
     setSaving(true);
     try {
       await onSave(
@@ -112,6 +123,7 @@ export function SignalForm({
       return;
     }
 
+    cancelTokenRef.current += 1;
     setDeleting(true);
     setError("");
     try {
@@ -161,6 +173,9 @@ export function SignalForm({
             existingUrl={
               keepExistingAudio ? existingSignal?.audioUrl ?? null : null
             }
+            readCancelToken={readCancelToken}
+            hasExisting={keepExistingAudio}
+            onBusyChange={setRecording}
             onChange={setAudio}
             onRemoveExisting={() => setKeepExistingAudio(false)}
             value={audio}
@@ -259,7 +274,7 @@ export function SignalForm({
             </Link>
             <button
               className="signal-save"
-              disabled={saving || deleting}
+              disabled={saving || deleting || recording}
               type="submit"
             >
               {saving
@@ -270,6 +285,11 @@ export function SignalForm({
               <ArrowRight aria-hidden="true" size={20} />
             </button>
           </div>
+          {recording ? (
+            <p className="field-note signal-dock__hint">
+              Najprv zastav nahrávanie.
+            </p>
+          ) : null}
           {existingSignal && onDelete ? (
             <button
               className="signal-delete"

@@ -16,19 +16,44 @@ export function baseMimeType(value: string | undefined): string {
 
 type AudioRecorderProps = {
   existingUrl?: string | null;
+  /**
+   * Whether a recording is attached to the saved signal. Kept separate from
+   * `existingUrl` because a signed-URL failure yields a playable-less recording
+   * that is still attached, and the participant must still be able to remove it.
+   */
+  hasExisting?: boolean;
   value?: Blob | null;
   onChange(value: Blob | null): void;
+  /**
+   * Reports whether a capture is in flight. Only `recording` counts: during
+   * `requesting` nothing has been captured yet, so saving loses nothing and the
+   * participant must stay free to type instead if they never answer the prompt.
+   */
+  onBusyChange?(busy: boolean): void;
+  /**
+   * Reads a counter the parent bumps to abandon a microphone request that is
+   * still pending. Submitting or deleting navigates away, and a permission
+   * granted after that would otherwise start a capture nobody can reach. It is
+   * a getter rather than a prop value so the parent can bump it synchronously —
+   * a value mirrored through an effect would still be stale for one task, which
+   * is precisely the window this guard exists to close.
+   */
+  readCancelToken?(): number;
   onRemoveExisting?(): void;
 };
 
 export function AudioRecorder({
   existingUrl = null,
+  hasExisting = false,
   value = null,
+  readCancelToken,
   onChange,
+  onBusyChange,
   onRemoveExisting,
 }: AudioRecorderProps) {
+  const hasRecording = Boolean(value) || Boolean(existingUrl) || hasExisting;
   const [state, setState] = useState<RecorderState>(
-    value || existingUrl ? "recorded" : "idle",
+    hasRecording ? "recorded" : "idle",
   );
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
@@ -36,11 +61,23 @@ export function AudioRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const mountedRef = useRef(true);
+
   const objectUrl = useMemo(
     () => (value ? URL.createObjectURL(value) : null),
     [value],
   );
   const audioUrl = objectUrl ?? existingUrl;
+
+  // Held in a ref so a parent passing a fresh callback each render cannot
+  // retrigger the effect below.
+  const busyRef = useRef(onBusyChange);
+  useEffect(() => {
+    busyRef.current = onBusyChange;
+  }, [onBusyChange]);
+
+  useEffect(() => {
+    busyRef.current?.(state === "recording");
+  }, [state]);
 
   useEffect(() => {
     if (state !== "recording") {
@@ -77,13 +114,20 @@ export function AudioRecorder({
     return () => URL.revokeObjectURL(objectUrl);
   }, [objectUrl]);
 
+  // A failed start must never hide a recording that is still attached to the
+  // signal: the empty error state offers no delete control, so the participant
+  // would be shown "no recording" while the old one is still submitted.
+  function failStart(message: string) {
+    setError(message);
+    setState(hasRecording ? "recorded" : "error");
+  }
+
   async function start() {
     if (
       typeof MediaRecorder === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      setState("error");
-      setError("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
+      failStart("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
       return;
     }
 
@@ -91,6 +135,7 @@ export function AudioRecorder({
     setError("");
     setSeconds(0);
     chunksRef.current = [];
+    const requestedAt = readCancelToken?.() ?? 0;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -98,10 +143,17 @@ export function AudioRecorder({
       // path below still has a handle to stop the microphone with.
       streamRef.current = stream;
 
-      // The participant can leave while the permission prompt is open; the
-      // unmount cleanup already ran and would never see this stream.
+      // The participant can leave, save or delete while the permission prompt
+      // is open. The unmount cleanup already ran, or the parent abandoned the
+      // request, so nothing else would ever see this stream.
       if (!mountedRef.current) {
         releaseStream();
+        return;
+      }
+
+      if ((readCancelToken?.() ?? 0) !== requestedAt) {
+        releaseStream();
+        setState(hasRecording ? "recorded" : "idle");
         return;
       }
 
@@ -130,8 +182,11 @@ export function AudioRecorder({
       if (!mountedRef.current) {
         return;
       }
-      setState("error");
-      setError("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
+      if ((readCancelToken?.() ?? 0) !== requestedAt) {
+        setState(hasRecording ? "recorded" : "idle");
+        return;
+      }
+      failStart("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
     }
   }
 
@@ -161,11 +216,17 @@ export function AudioRecorder({
           <Pause aria-hidden="true" size={24} />
           <span>Zastaviť · {seconds}s</span>
         </button>
-      ) : state === "recorded" && audioUrl ? (
+      ) : state === "recorded" && hasRecording ? (
         <div className="recorded-audio">
-          <audio controls src={audioUrl}>
-            <track kind="captions" />
-          </audio>
+          {audioUrl ? (
+            <audio controls src={audioUrl}>
+              <track kind="captions" />
+            </audio>
+          ) : (
+            // Attached but not playable (for example a signed-URL failure).
+            // Still offer the controls so it can be replaced or removed.
+            <p className="field-note">Nahrávka je uložená.</p>
+          )}
           <button
             aria-label="Nahrať znova"
             onClick={() => void start()}

@@ -60,15 +60,33 @@ export function FestivalEntry() {
           signal.teamId === savedTeam.id,
       )
     : null;
-  const notice =
-    savedTeam && savedSignal
-      ? `Uložené pre ${savedTeam.name} · ${formatCredits(
-          savedSignal.amount,
+  // The saved amount travels in the URL because a write resolves even when its
+  // post-write refresh fails. Falling back to the snapshot alone would drop the
+  // confirmation entirely on a first save, or show the pre-edit amount on an
+  // edit, exactly when the connection is worst.
+  // Only a plain non-negative integer is trusted. `Number("")` is 0, so a
+  // laxer check would render "· 0🥞" for `?amount=` and defeat the fallback
+  // this exists for. Zero itself is a legal amount and stays accepted.
+  const savedAmountParam = searchParams.get("amount");
+  const parsedAmount =
+    savedAmountParam && /^\d+$/.test(savedAmountParam)
+      ? Number(savedAmountParam)
+      : Number.NaN;
+  const savedAmount =
+    Number.isSafeInteger(parsedAmount) &&
+    parsedAmount <= snapshot.event.maxPerTeam
+      ? parsedAmount
+      : (savedSignal?.amount ?? null);
+  const notice = savedTeam
+    ? savedAmount === null
+      ? `Uložené pre ${savedTeam.name}`
+      : `Uložené pre ${savedTeam.name} · ${formatCredits(
+          savedAmount,
           snapshot.event.currency,
         )}`
-      : removedTeam
-        ? `Investícia pre ${removedTeam.name} odstránená`
-        : null;
+    : removedTeam
+      ? `Investícia pre ${removedTeam.name} odstránená`
+      : null;
 
   if (currentPerson.role !== "organizer") {
     return (

@@ -124,9 +124,13 @@ begin
       from budget
     ),
     (
+      -- Floor below completion so the public wall cannot show a full bar
+      -- while credits are still left. Mirrors deriveEventStats in
+      -- src/lib/domain/stats.ts.
       select case
         when total = 0 then 0
-        else least(100, round(100.0 * distributed / total)::integer)
+        when distributed >= total then 100
+        else floor(100.0 * distributed / total)::integer
       end
       from budget
     ),
@@ -174,6 +178,25 @@ begin
     updated_at = excluded.updated_at;
 end;
 $$;
+
+-- The bootstrap migration created the AI Build Week event with '$' before the
+-- pancake default existed, and both seeds insert with `on conflict do nothing`,
+-- so neither can change a row that already exists.
+--
+-- This is a deliberate one-off override for this slug, NOT provenance: matching
+-- on slug plus the current value cannot distinguish the untouched bootstrap
+-- value from a '$' an organizer chose on purpose, because update_event_settings
+-- accepts '$' at any event status. It is scoped as narrowly as possible, and
+-- '🥞' is the single code point U+1F95E, so it passes that RPC's 1-3 character
+-- validation. If an organizer has deliberately selected '$' for this event,
+-- drop this statement before deploying.
+--
+-- Note: this statement only runs where migration version 202607300001 has not
+-- been applied yet. A database that already has it needs a new migration.
+update public.events
+set currency = '🥞'
+where slug = 'ai-build-week'
+  and currency = '$';
 
 do $$
 declare
