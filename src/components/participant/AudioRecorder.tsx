@@ -30,6 +30,12 @@ type AudioRecorderProps = {
    * participant must stay free to type instead if they never answer the prompt.
    */
   onBusyChange?(busy: boolean): void;
+  /**
+   * Bump to abandon a microphone request that is still pending. Submitting or
+   * deleting navigates away, and a permission granted after that would
+   * otherwise start a capture nobody can reach.
+   */
+  cancelToken?: number;
   onRemoveExisting?(): void;
 };
 
@@ -37,6 +43,7 @@ export function AudioRecorder({
   existingUrl = null,
   hasExisting = false,
   value = null,
+  cancelToken = 0,
   onChange,
   onBusyChange,
   onRemoveExisting,
@@ -51,6 +58,9 @@ export function AudioRecorder({
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const mountedRef = useRef(true);
+  // Mirrors `cancelToken` so an in-flight getUserMedia call can tell whether it
+  // was abandoned while the permission prompt was open.
+  const cancelTokenRef = useRef(cancelToken);
   const objectUrl = useMemo(
     () => (value ? URL.createObjectURL(value) : null),
     [value],
@@ -67,6 +77,10 @@ export function AudioRecorder({
   useEffect(() => {
     busyRef.current?.(state === "recording");
   }, [state]);
+
+  useEffect(() => {
+    cancelTokenRef.current = cancelToken;
+  }, [cancelToken]);
 
   useEffect(() => {
     if (state !== "recording") {
@@ -124,6 +138,7 @@ export function AudioRecorder({
     setError("");
     setSeconds(0);
     chunksRef.current = [];
+    const requestedAt = cancelTokenRef.current;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -131,10 +146,17 @@ export function AudioRecorder({
       // path below still has a handle to stop the microphone with.
       streamRef.current = stream;
 
-      // The participant can leave while the permission prompt is open; the
-      // unmount cleanup already ran and would never see this stream.
+      // The participant can leave, save or delete while the permission prompt
+      // is open. The unmount cleanup already ran, or the parent abandoned the
+      // request, so nothing else would ever see this stream.
       if (!mountedRef.current) {
         releaseStream();
+        return;
+      }
+
+      if (cancelTokenRef.current !== requestedAt) {
+        releaseStream();
+        setState(hasRecording ? "recorded" : "idle");
         return;
       }
 
@@ -161,6 +183,10 @@ export function AudioRecorder({
     } catch {
       releaseStream();
       if (!mountedRef.current) {
+        return;
+      }
+      if (cancelTokenRef.current !== requestedAt) {
+        setState(hasRecording ? "recorded" : "idle");
         return;
       }
       failStart("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");

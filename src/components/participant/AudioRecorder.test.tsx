@@ -96,6 +96,38 @@ describe("AudioRecorder microphone lifecycle", () => {
     expect(onChange.mock.calls[0][0].type).toBe("audio/webm");
   });
 
+  it("abandons a permission request that resolves after cancellation", async () => {
+    const { track, stream } = fakeStream();
+    const { grant } = stubMedia(stream);
+    const started = vi.fn();
+    vi.stubGlobal(
+      "MediaRecorder",
+      class {
+        state = "inactive";
+        addEventListener() {}
+        start() {
+          started();
+        }
+        stop() {}
+      },
+    );
+
+    const { rerender } = render(
+      <AudioRecorder cancelToken={0} onChange={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+
+    // Saving or deleting bumps the token while the prompt is still open.
+    rerender(<AudioRecorder cancelToken={1} onChange={vi.fn()} />);
+    await act(async () => {
+      grant();
+    });
+
+    // The late permission must not start a capture nobody can reach.
+    expect(started).not.toHaveBeenCalled();
+    expect(track.stop).toHaveBeenCalled();
+  });
+
   it("keeps an attached recording removable when re-recording fails", async () => {
     const { stream } = fakeStream();
     const { grant } = stubMedia(stream);

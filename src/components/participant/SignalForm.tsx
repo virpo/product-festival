@@ -66,6 +66,9 @@ export function SignalForm({
   // throw the recording away when navigation unmounts the recorder. Deleting
   // discards the whole signal, so it stays available.
   const [recording, setRecording] = useState(false);
+  // Bumped when we navigate away, so a microphone request still waiting on the
+  // permission prompt is abandoned instead of capturing into a dead form.
+  const [cancelToken, setCancelToken] = useState(0);
 
   function setSafeAmount(value: number) {
     setAmount(Math.max(0, Math.min(maximum, Number.isFinite(value) ? value : 0)));
@@ -80,6 +83,7 @@ export function SignalForm({
       return;
     }
 
+    setCancelToken((token) => token + 1);
     setSaving(true);
     try {
       await onSave(
@@ -115,6 +119,7 @@ export function SignalForm({
       return;
     }
 
+    setCancelToken((token) => token + 1);
     setDeleting(true);
     setError("");
     try {
@@ -164,6 +169,7 @@ export function SignalForm({
             existingUrl={
               keepExistingAudio ? existingSignal?.audioUrl ?? null : null
             }
+            cancelToken={cancelToken}
             hasExisting={keepExistingAudio}
             onBusyChange={setRecording}
             onChange={setAudio}
