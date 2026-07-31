@@ -1,6 +1,6 @@
 import type { FestivalSnapshot } from "@/lib/domain/types";
 import { createDemoSnapshot } from "@/lib/repository/demo-data";
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { PancakeMarketAdmin } from "./PancakeMarketAdmin";
@@ -132,6 +132,69 @@ describe("PancakeMarketAdmin", () => {
     expect(
       screen.getByText("Palacinkové balíčky sú uložené."),
     ).toBeInTheDocument();
+  });
+
+  it("does not apply a catalogue snapshot already seen during a save", async () => {
+    const user = userEvent.setup();
+    const snapshot = snapshotAt("open");
+    let resolveSave!: () => void;
+    const onSave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    const view = render(
+      <PancakeMarketAdmin onSave={onSave} snapshot={snapshot} />,
+    );
+
+    const firstName = screen.getByLabelText("Názov balíčka 1");
+    await user.clear(firstName);
+    await user.type(firstName, "Peterov nugát");
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    const alreadySeen = structuredClone(snapshot);
+    alreadySeen.pancakePackages[0].name = "Stará vzdialená hodnota";
+    view.rerender(
+      <PancakeMarketAdmin onSave={onSave} snapshot={alreadySeen} />,
+    );
+
+    await act(async () => resolveSave());
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Názov balíčka 1")).toHaveValue(
+        "Peterov nugát",
+      ),
+    );
+    expect(
+      screen.getByText("Palacinkové balíčky sú uložené."),
+    ).toBeInTheDocument();
+  });
+
+  it("disables catalogue controls while a save is pending", async () => {
+    const user = userEvent.setup();
+    let resolveSave!: () => void;
+    const onSave = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    render(<PancakeMarketAdmin onSave={onSave} snapshot={snapshotAt("open")} />);
+
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    expect(screen.getByLabelText("Názov balíčka 1")).toBeDisabled();
+    expect(screen.getByLabelText("Cena balíčka 1")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Posunúť balíček 2 nižšie" }),
+    ).toBeDisabled();
+
+    await act(async () => resolveSave());
   });
 
   it("shows read-only fulfillment after release without ranking", () => {

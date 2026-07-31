@@ -10,7 +10,7 @@ import type {
   PancakePackageDraft,
 } from "@/lib/domain/types";
 import { ArrowDown, ArrowUp, CheckCircle2, Store } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 type PancakeMarketAdminProps = {
   snapshot: FestivalSnapshot;
@@ -41,6 +41,7 @@ export function PancakeMarketAdmin({
   );
   const persistedSignature = catalogueSignature(persistedDrafts);
   const appliedSignature = useRef(persistedSignature);
+  const latestPersistedSignature = useRef(persistedSignature);
   const [drafts, setDrafts] = useState(persistedDrafts);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,7 +52,8 @@ export function PancakeMarketAdmin({
     .sort((left, right) => left.number - right.number);
   const released = snapshot.event.status === "released";
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    latestPersistedSignature.current = persistedSignature;
     if (!dirty && appliedSignature.current !== persistedSignature) {
       setDrafts(persistedDrafts);
       appliedSignature.current = persistedSignature;
@@ -106,6 +108,7 @@ export function PancakeMarketAdmin({
     setSaving(true);
     try {
       await onSave(normalized);
+      appliedSignature.current = latestPersistedSignature.current;
       setDrafts(normalized);
       setDirty(false);
       setMessage("Palacinkové balíčky sú uložené.");
@@ -223,7 +226,7 @@ export function PancakeMarketAdmin({
           <h3>Balíčky</h3>
           <div className="admin-market-package-list">
             {drafts.map((item, index) => (
-              <fieldset key={`${item.position}-${index}`}>
+              <fieldset disabled={saving} key={`${item.position}-${index}`}>
                 <legend>Balíček {index + 1}</legend>
                 <label>
                   Názov balíčka {index + 1}
