@@ -138,15 +138,18 @@ describe("DemoFestivalRepository", () => {
     const listener = vi.fn();
     repo.subscribe(listener);
     await repo.claimPerson("ADMIN");
-    const configured = (await repo.getSnapshot()).pancakePackages.map(
-      ({ name, position, price }) => ({
-        name,
-        position,
-        price: position === 6 ? 30 : position === 7 ? 20 : price,
-      }),
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
     );
+    const configured = original.map((item) => ({
+      ...item,
+      price:
+        item.position === 6 ? 30 : item.position === 7 ? 20 : item.price,
+    }));
 
-    await expect(repo.savePancakeCatalog(configured)).resolves.toHaveLength(7);
+    await expect(
+      repo.savePancakeCatalog(configured, original),
+    ).resolves.toHaveLength(7);
     expect(
       (await repo.getSnapshot()).pancakePackages.map((item) => item.price),
     ).toEqual([700, 600, 500, 400, 300, 30, 20]);
@@ -154,22 +157,52 @@ describe("DemoFestivalRepository", () => {
 
     await repo.advanceEvent("locked");
     await repo.advanceEvent("released");
-    await expect(repo.savePancakeCatalog(configured)).rejects.toThrow(
+    await expect(
+      repo.savePancakeCatalog(configured, configured),
+    ).rejects.toThrow(
       "Palacinková burza je už otvorená.",
+    );
+  });
+
+  it("rejects a catalogue save from a stale organizer draft", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const firstSave = original.map((item) => ({
+      ...item,
+      name: item.position === 1 ? "Prvý nugát" : item.name,
+    }));
+    const staleSave = original.map((item) => ({
+      ...item,
+      name: item.position === 1 ? "Starý nugát" : item.name,
+    }));
+
+    await repo.savePancakeCatalog(firstSave, original);
+
+    await expect(
+      repo.savePancakeCatalog(staleSave, original),
+    ).rejects.toThrow(
+      "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+    );
+    expect((await repo.getSnapshot()).pancakePackages[0].name).toBe(
+      "Prvý nugát",
     );
   });
 
   it("keeps one replaceable affordable selection for the member's team", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     await repo.claimPerson("ADMIN");
-    const configured = (await repo.getSnapshot()).pancakePackages.map(
-      ({ name, position, price }) => ({
-        name,
-        position,
-        price: position === 6 ? 30 : position === 7 ? 20 : price,
-      }),
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
     );
-    await repo.savePancakeCatalog(configured);
+    const configured = original.map((item) => ({
+      ...item,
+      price:
+        item.position === 6 ? 30 : item.position === 7 ? 20 : item.price,
+    }));
+    await repo.savePancakeCatalog(configured, original);
     await repo.advanceEvent("locked");
     await repo.advanceEvent("released");
     await repo.signOut();
@@ -200,14 +233,14 @@ describe("DemoFestivalRepository", () => {
   it("does not remove the person who chose the team package", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     await repo.claimPerson("ADMIN");
-    const configured = (await repo.getSnapshot()).pancakePackages.map(
-      ({ name, position, price }) => ({
-        name,
-        position,
-        price: position === 7 ? 20 : price,
-      }),
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
     );
-    await repo.savePancakeCatalog(configured);
+    const configured = original.map((item) => ({
+      ...item,
+      price: item.position === 7 ? 20 : item.price,
+    }));
+    await repo.savePancakeCatalog(configured, original);
     await repo.advanceEvent("locked");
     await repo.advanceEvent("released");
     await repo.signOut();

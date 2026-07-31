@@ -18,6 +18,9 @@ export const DEFAULT_PANCAKE_PACKAGE_DRAFTS = [
   { position: 7, name: "Bryndza + kakaový prášok", price: 100 },
 ] as const satisfies readonly PancakePackageDraft[];
 
+export const PANCAKE_CATALOG_STALE_MESSAGE =
+  "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.";
+
 export function validatePancakeCatalog(
   drafts: readonly PancakePackageDraft[],
 ): PancakePackageDraft[] {

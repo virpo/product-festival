@@ -1,5 +1,6 @@
 import {
   DEFAULT_PANCAKE_PACKAGE_DRAFTS,
+  PANCAKE_CATALOG_STALE_MESSAGE,
   canTeamAffordPackage,
   validatePancakeCatalog,
 } from "@/lib/domain/pancake-market";
@@ -669,6 +670,7 @@ export class DemoFestivalRepository implements FestivalRepository {
 
   async savePancakeCatalog(
     packages: PancakePackageDraft[],
+    expectedPackages: PancakePackageDraft[],
   ): Promise<PancakePackage[]> {
     const snapshot = this.read();
     const currentPersonId = this.storage.getItem(PERSON_KEY);
@@ -682,6 +684,18 @@ export class DemoFestivalRepository implements FestivalRepository {
 
     if (snapshot.event.status === "released") {
       throw new Error("Palacinková burza je už otvorená.");
+    }
+
+    const normalizedExpected = validatePancakeCatalog(expectedPackages);
+    const current = validatePancakeCatalog(
+      snapshot.pancakePackages.map(({ name, position, price }) => ({
+        name,
+        position,
+        price,
+      })),
+    );
+    if (JSON.stringify(current) !== JSON.stringify(normalizedExpected)) {
+      throw new Error(PANCAKE_CATALOG_STALE_MESSAGE);
     }
 
     const normalized = validatePancakeCatalog(packages);

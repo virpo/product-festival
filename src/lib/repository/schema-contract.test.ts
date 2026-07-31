@@ -246,6 +246,11 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain(
       "person_with_pancake_selection_cannot_be_removed",
     );
+    expect(sql).toContain("target_expected_packages jsonb");
+    expect(sql).toContain("pancake_catalog_stale");
+    expect(sql).toContain(
+      "grant execute on function public.save_pancake_catalog(uuid, jsonb, jsonb) to authenticated",
+    );
     expect(
       sql.match(
         /update public\.events\s+set updated_at = now\(\)\s+where id = target_event_id;/g,

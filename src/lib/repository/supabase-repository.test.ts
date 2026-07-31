@@ -256,7 +256,9 @@ describe("SupabaseFestivalRepository", () => {
       { name: "Bryndza", price: 100, position: 7 },
     ];
 
-    await expect(repository.savePancakeCatalog(packages)).resolves.toEqual([
+    await expect(
+      repository.savePancakeCatalog(packages, packages),
+    ).resolves.toEqual([
       {
         id: "package-1",
         eventId: "event-1",
@@ -268,6 +270,7 @@ describe("SupabaseFestivalRepository", () => {
     expect(client.rpc).toHaveBeenCalledWith("save_pancake_catalog", {
       target_event_id: "event-1",
       target_packages: packages,
+      target_expected_packages: packages,
     });
   });
 
@@ -313,6 +316,32 @@ describe("SupabaseFestivalRepository", () => {
 
     await expect(repository.removePerson("person-1")).rejects.toThrow(
       "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
+    );
+  });
+
+  it("maps a stale catalogue save to a useful conflict error", async () => {
+    const { client } = fakeClient();
+    client.rpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: "pancake_catalog_stale" },
+    });
+    const repository = new SupabaseFestivalRepository(client as never, {
+      eventSlug: "ai-build-week",
+    });
+    const packages = [
+      { name: "Nugát", price: 700, position: 1 },
+      { name: "Orechy", price: 600, position: 2 },
+      { name: "Tvaroh", price: 500, position: 3 },
+      { name: "Mak", price: 400, position: 4 },
+      { name: "Káva", price: 300, position: 5 },
+      { name: "Gaštan", price: 200, position: 6 },
+      { name: "Bryndza", price: 100, position: 7 },
+    ];
+
+    await expect(
+      repository.savePancakeCatalog(packages, packages),
+    ).rejects.toThrow(
+      "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
     );
   });
 });

@@ -27,7 +27,10 @@ export type FestivalContextValueForTests = {
     resetDemo(): Promise<void>;
     savePerson(input: SavePersonInput): Promise<void>;
     saveTeam(input: SaveTeamInput): Promise<void>;
-    savePancakeCatalog(packages: PancakePackageDraft[]): Promise<void>;
+    savePancakeCatalog(
+      packages: PancakePackageDraft[],
+      expectedPackages: PancakePackageDraft[],
+    ): Promise<void>;
     updateEvent(patch: Partial<FestivalEvent>): Promise<void>;
   };
 };

@@ -93,7 +93,8 @@ revoke insert, update, delete on public.team_pancake_selections from authenticat
 
 create or replace function public.save_pancake_catalog(
   target_event_id uuid,
-  target_packages jsonb
+  target_packages jsonb,
+  target_expected_packages jsonb
 )
 returns setof public.pancake_packages
 language plpgsql
@@ -102,6 +103,7 @@ set search_path = public
 as $$
 declare
   event_row public.events%rowtype;
+  current_packages jsonb;
   invalid_item boolean;
   position_count integer;
   has_invalid_price_order boolean;
@@ -171,6 +173,26 @@ begin
 
   if has_invalid_price_order then
     raise exception 'pancake_prices_must_descend';
+  end if;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'name', package_row.name,
+        'price', package_row.price,
+        'position', package_row.position
+      )
+      order by package_row.position
+    ),
+    '[]'::jsonb
+  )
+  into current_packages
+  from public.pancake_packages package_row
+  where package_row.event_id = target_event_id;
+
+  if target_expected_packages is null
+    or current_packages <> target_expected_packages then
+    raise exception 'pancake_catalog_stale';
   end if;
 
   delete from public.pancake_packages
@@ -371,7 +393,7 @@ end;
 $$;
 
 revoke all on function public.seed_pancake_catalog(uuid) from public;
-revoke all on function public.save_pancake_catalog(uuid, jsonb) from public;
+revoke all on function public.save_pancake_catalog(uuid, jsonb, jsonb) from public;
 revoke all on function public.select_pancake_package(uuid, uuid) from public;
-grant execute on function public.save_pancake_catalog(uuid, jsonb) to authenticated;
+grant execute on function public.save_pancake_catalog(uuid, jsonb, jsonb) to authenticated;
 grant execute on function public.select_pancake_package(uuid, uuid) to authenticated;

@@ -87,7 +87,68 @@ describe("PancakeMarketAdmin", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "Peterov nugát", position: 1 }),
       ]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Nugátová plnka + jahodový kompót",
+          position: 1,
+        }),
+      ]),
     );
+  });
+
+  it("saves against the catalogue that the dirty draft started from", async () => {
+    const user = userEvent.setup();
+    const snapshot = snapshotAt("open");
+    const onSave = vi.fn().mockRejectedValue(new Error("stale"));
+    const view = render(
+      <PancakeMarketAdmin onSave={onSave} snapshot={snapshot} />,
+    );
+    const firstName = screen.getByLabelText("Názov balíčka 1");
+    await user.clear(firstName);
+    await user.type(firstName, "Peterov nugát");
+
+    const remote = structuredClone(snapshot);
+    remote.pancakePackages[0].name = "Vzdialený nugát";
+    view.rerender(<PancakeMarketAdmin onSave={onSave} snapshot={remote} />);
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Peterov nugát", position: 1 }),
+      ]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Nugátová plnka + jahodový kompót",
+          position: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("explains a stale catalogue conflict without discarding the draft", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockRejectedValue(
+      new Error(
+        "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+      ),
+    );
+    render(<PancakeMarketAdmin onSave={onSave} snapshot={snapshotAt("open")} />);
+    const firstName = screen.getByLabelText("Názov balíčka 1");
+    await user.clear(firstName);
+    await user.type(firstName, "Peterov nugát");
+
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    expect(
+      screen.getByText(
+        "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+      ),
+    ).toBeInTheDocument();
+    expect(firstName).toHaveValue("Peterov nugát");
   });
 
   it("moves complete package rows and rewrites positions", async () => {

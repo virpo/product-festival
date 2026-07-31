@@ -2,6 +2,7 @@
 
 import { formatCredits } from "@/lib/domain/credits";
 import {
+  PANCAKE_CATALOG_STALE_MESSAGE,
   teamReceivedAmount,
   validatePancakeCatalog,
 } from "@/lib/domain/pancake-market";
@@ -14,7 +15,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 type PancakeMarketAdminProps = {
   snapshot: FestivalSnapshot;
-  onSave: (packages: PancakePackageDraft[]) => Promise<void>;
+  onSave: (
+    packages: PancakePackageDraft[],
+    expectedPackages: PancakePackageDraft[],
+  ) => Promise<void>;
 };
 
 function sortedDrafts(snapshot: FestivalSnapshot): PancakePackageDraft[] {
@@ -42,6 +46,7 @@ export function PancakeMarketAdmin({
   const persistedSignature = catalogueSignature(persistedDrafts);
   const appliedSignature = useRef(persistedSignature);
   const latestPersistedSignature = useRef(persistedSignature);
+  const appliedDrafts = useRef(persistedDrafts);
   const [drafts, setDrafts] = useState(persistedDrafts);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -56,6 +61,7 @@ export function PancakeMarketAdmin({
     latestPersistedSignature.current = persistedSignature;
     if (!dirty && appliedSignature.current !== persistedSignature) {
       setDrafts(persistedDrafts);
+      appliedDrafts.current = persistedDrafts;
       appliedSignature.current = persistedSignature;
     }
   }, [dirty, persistedDrafts, persistedSignature]);
@@ -107,13 +113,19 @@ export function PancakeMarketAdmin({
 
     setSaving(true);
     try {
-      await onSave(normalized);
+      await onSave(normalized, appliedDrafts.current);
       appliedSignature.current = latestPersistedSignature.current;
+      appliedDrafts.current = normalized;
       setDrafts(normalized);
       setDirty(false);
       setMessage("Palacinkové balíčky sú uložené.");
-    } catch {
-      setError("Nastavenia sa nepodarilo uložiť. Skús to znova.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error &&
+          saveError.message === PANCAKE_CATALOG_STALE_MESSAGE
+          ? PANCAKE_CATALOG_STALE_MESSAGE
+          : "Nastavenia sa nepodarilo uložiť. Skús to znova.",
+      );
     } finally {
       setSaving(false);
     }
