@@ -112,10 +112,7 @@ export class DemoFestivalRepository implements FestivalRepository {
    * back to life on the released receipt, which renders from `audioUrl` alone.
    */
   private attachAudioUrls(snapshot: FestivalSnapshot) {
-    const present = new Set<string>();
-
     for (const signal of snapshot.signals) {
-      present.add(signal.id);
       const live = signal.audioPath ? this.audioUrls.get(signal.id) : undefined;
 
       if (live) {
@@ -127,9 +124,9 @@ export class DemoFestivalRepository implements FestivalRepository {
 
     // Release URLs whose signal lost its recording or was removed elsewhere.
     for (const [signalId, url] of this.audioUrls) {
-      const signal = present.has(signalId)
-        ? snapshot.signals.find((candidate) => candidate.id === signalId)
-        : undefined;
+      const signal = snapshot.signals.find(
+        (candidate) => candidate.id === signalId,
+      );
 
       if (!signal?.audioPath) {
         URL.revokeObjectURL(url);
@@ -300,7 +297,12 @@ export class DemoFestivalRepository implements FestivalRepository {
       // Register (and revoke any superseded URL) only after the snapshot is
       // persisted. `write()` can throw on a full storage quota, and revoking
       // first would leave the retained recording referenced but unplayable.
-      this.rememberAudioUrl(existing.id, audioUrl);
+      // Only object URLs belong in the map; a durable URL needs no revoking and
+      // `attachAudioUrls` already leaves it untouched.
+      this.rememberAudioUrl(
+        existing.id,
+        audioUrl?.startsWith("blob:") ? audioUrl : null,
+      );
 
       return structuredClone(existing);
     }
