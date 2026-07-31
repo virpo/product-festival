@@ -4,6 +4,7 @@ import type {
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
+  PancakePackageDraft,
   Person,
   SignalInput,
   SignalSaveResult,
@@ -58,6 +59,8 @@ type FestivalContextValue = {
     removeTeam(teamId: string): Promise<void>;
     savePerson(input: SavePersonInput): Promise<void>;
     removePerson(personId: string): Promise<void>;
+    savePancakeCatalog(packages: PancakePackageDraft[]): Promise<void>;
+    selectPancakePackage(packageId: string): Promise<void>;
     updateEvent(patch: Partial<FestivalEvent>): Promise<void>;
     advanceEvent(status: EventStatus): Promise<void>;
     resetDemo(): Promise<void>;
@@ -470,6 +473,12 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       },
       async removePerson(personId) {
         await run(() => repository!.removePerson(personId));
+      },
+      async savePancakeCatalog(packages) {
+        await run(() => repository!.savePancakeCatalog(packages));
+      },
+      async selectPancakePackage(packageId) {
+        await run(() => repository!.selectPancakePackage(packageId));
       },
       async updateEvent(patch) {
         await run(() => repository!.updateEvent(patch));

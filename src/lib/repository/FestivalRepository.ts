@@ -2,11 +2,14 @@ import type {
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
+  PancakePackage,
+  PancakePackageDraft,
   Person,
   PersonRole,
   SignalInput,
   SignalSaveResult,
   Team,
+  TeamPancakeSelection,
 } from "@/lib/domain/types";
 
 export type RepositoryMode = "demo" | "supabase";
@@ -71,6 +74,10 @@ export type FestivalRepository = {
   removeTeam(teamId: string): Promise<void>;
   savePerson(input: SavePersonInput): Promise<Person>;
   removePerson(personId: string): Promise<void>;
+  savePancakeCatalog(
+    packages: PancakePackageDraft[],
+  ): Promise<PancakePackage[]>;
+  selectPancakePackage(packageId: string): Promise<TeamPancakeSelection>;
   updateEvent(patch: Partial<FestivalEvent>): Promise<FestivalEvent>;
   advanceEvent(status: EventStatus): Promise<FestivalEvent>;
   resetDemo(): Promise<void>;
