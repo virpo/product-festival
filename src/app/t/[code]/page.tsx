@@ -25,6 +25,7 @@ export default function TeamPage() {
   const { commands, connection, currentPerson, error, mode, privateBonusTotal, snapshot } =
     useFestival();
   const [savedAwards, setSavedAwards] = useState<SignalSaveResult["awards"]>([]);
+  const [savedAmount, setSavedAmount] = useState<number | null>(null);
   // Keyed by person and team: this route component can be preserved across
   // `[code]` changes, and a plain boolean would then suppress the next team's
   // visit for the rest of the session.
@@ -202,6 +203,7 @@ export default function TeamPage() {
     const result = await commands.upsertSignal(input, audio);
     if (result?.awards?.length) {
       setSavedAwards(result.awards);
+      setSavedAmount(input.amount);
       return;
     }
     router.push(
@@ -219,14 +221,23 @@ export default function TeamPage() {
       back={{ href: backHref, label: headerBackLabel }}
       mode={mode}
       person={currentPerson}
-      privateBonusTotal={privateBonusTotal}
       snapshot={snapshot}
+      privateBonusTotal={
+        privateBonusTotal -
+        (savedAwards.length
+          ? savedAwards.reduce((total, award) => total + award.amount, 0)
+          : 0)
+      }
     >
       {savedAwards.length > 0 ? (
         <BonusReveal
           awards={savedAwards}
           currency={snapshot.event.currency}
-          onContinue={() => router.push(`/?saved=${encodeURIComponent(teamCode)}`)}
+          onContinue={() =>
+            router.push(
+              `/?saved=${encodeURIComponent(teamCode)}${savedAmount === null ? "" : `&amount=${savedAmount}`}`,
+            )
+          }
         />
       ) : snapshot.event.status === "open" ? (
         <SignalForm

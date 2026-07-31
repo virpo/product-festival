@@ -297,6 +297,8 @@ export class DemoFestivalRepository implements FestivalRepository {
         signal.investorId === normalized.investorId &&
         signal.teamId === normalized.teamId,
     );
+    const previousSnapshot = this.storage.getItem(SNAPSHOT_KEY);
+    const previousAwards = this.storage.getItem(AWARDS_KEY);
 
     if (existing) {
       // Follow the path, not the presence of a new blob. Keeping the old URL
@@ -318,7 +320,40 @@ export class DemoFestivalRepository implements FestivalRepository {
           : null;
 
       Object.assign(existing, normalized, { audioUrl, updatedAt: now });
-      this.write(snapshot);
+      const shouldAwardAudio =
+        Boolean(normalized.audioPath) &&
+        !awards.some(
+          (award) =>
+            award.personId === normalized.investorId &&
+            award.achievement === "voice-of-the-festival",
+        ) &&
+        !snapshot.signals.some(
+          (signal) =>
+            signal.id !== existing.id &&
+            signal.investorId === normalized.investorId &&
+            Boolean(signal.audioPath),
+        );
+      const audioAwards: BonusAward[] = shouldAwardAudio
+        ? [{
+            id: crypto.randomUUID(),
+            eventId: snapshot.event.id,
+            personId: normalized.investorId,
+            achievement: "voice-of-the-festival",
+            amount: 5,
+            teamId: null,
+            createdAt: now,
+          }]
+        : [];
+      try {
+        this.writeAwards([...awards, ...audioAwards]);
+        this.write(snapshot);
+      } catch (error) {
+        if (previousAwards === null) this.storage.removeItem(AWARDS_KEY);
+        else this.storage.setItem(AWARDS_KEY, previousAwards);
+        if (previousSnapshot === null) this.storage.removeItem(SNAPSHOT_KEY);
+        else this.storage.setItem(SNAPSHOT_KEY, previousSnapshot);
+        throw error;
+      }
       // Register (and revoke any superseded URL) only after the snapshot is
       // persisted. `write()` can throw on a full storage quota, and revoking
       // first would leave the retained recording referenced but unplayable.
@@ -329,7 +364,17 @@ export class DemoFestivalRepository implements FestivalRepository {
         audioUrl?.startsWith("blob:") ? audioUrl : null,
       );
 
-      return { signal: structuredClone(existing), awards: [] };
+      return {
+        signal: structuredClone(existing),
+        awards: audioAwards.length
+          ? [{
+              achievement: "voice-of-the-festival",
+              amount: 5,
+              title: "Hlas festivalu!",
+              message: "Tvoja prvá hlasová poznámka dala spätnej väzbe nový rozmer.",
+            }]
+          : [],
+      };
     }
 
     const signalId = crypto.randomUUID();
@@ -351,18 +396,34 @@ export class DemoFestivalRepository implements FestivalRepository {
       candidate: signal,
       now,
     });
+    const ownTeamId = snapshot.teamMembers.find(
+      (membership) => membership.personId === normalized.investorId,
+    )?.teamId ?? null;
     const newAwards: BonusAward[] = receipts.map((receipt) => ({
       id: crypto.randomUUID(),
       eventId: snapshot.event.id,
       personId: normalized.investorId,
       achievement: receipt.achievement,
       amount: receipt.amount,
-      teamId: receipt.achievement === "helpful-spotlight" ? signal.teamId : null,
+      teamId:
+        receipt.achievement === "team-joins-in"
+          ? ownTeamId
+          : receipt.achievement === "first-light" || receipt.achievement === "helpful-spotlight"
+            ? signal.teamId
+            : null,
       createdAt: now,
     }));
     snapshot.signals.push(signal);
-    this.writeAwards([...awards, ...newAwards]);
-    this.write(snapshot);
+    try {
+      this.writeAwards([...awards, ...newAwards]);
+      this.write(snapshot);
+    } catch (error) {
+      if (previousAwards === null) this.storage.removeItem(AWARDS_KEY);
+      else this.storage.setItem(AWARDS_KEY, previousAwards);
+      if (previousSnapshot === null) this.storage.removeItem(SNAPSHOT_KEY);
+      else this.storage.setItem(SNAPSHOT_KEY, previousSnapshot);
+      throw error;
+    }
     this.rememberAudioUrl(signalId, signal.audioUrl);
     return { signal: structuredClone(signal), awards: receipts };
   }

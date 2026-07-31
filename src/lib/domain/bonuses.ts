@@ -49,14 +49,16 @@ export function calculateBonusAwards(input: BonusCalculationInput): BonusReceipt
   const results: BonusReceipt[] = [];
   const add = (achievement: BonusAchievement, teamId?: string) => {
     if (achievement === "helpful-spotlight") {
-      if (teamId && personAwards.some((award) => award.achievement === achievement && award.teamId === teamId)) return;
+      if (!teamId || personAwards.some((award) => award.achievement === achievement && award.teamId === teamId)) return;
+    } else if (achievement === "first-light" || achievement === "team-joins-in") {
+      if (!teamId || awards.some((award) => award.achievement === achievement && award.teamId === teamId)) return;
     } else if (earned.has(achievement)) return;
     results.push({ achievement, ...DETAILS[achievement] });
   };
 
   if (personSignals.length === 0) add("first-spark");
-  if (ownTeamIds.size > 0 && !signals.some((signal) => teammateIds.has(signal.investorId))) add("team-joins-in");
-  if (!signals.some((signal) => signal.teamId === candidate.teamId)) add("first-light");
+  if (ownTeamIds.size > 0 && !signals.some((signal) => teammateIds.has(signal.investorId))) add("team-joins-in", [...ownTeamIds][0]);
+  if (!signals.some((signal) => signal.teamId === candidate.teamId)) add("first-light", candidate.teamId);
 
   if (isMidpoint(event, input.now)) {
     const counts = foreignTeams.map((team) => ({ teamId: team.id, count: signals.filter((signal) => signal.teamId === team.id).length }));

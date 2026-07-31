@@ -37,6 +37,7 @@ export function ParticipantHome({
 }: ParticipantHomeProps) {
   const coverage = coverageFor(person.id, snapshot);
   const remaining = remainingWallet(person.id, snapshot) + privateBonusTotal;
+  const totalBudget = person.walletBudget + privateBonusTotal;
   const signals = snapshot.signals
     .filter((signal) => signal.investorId === person.id)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -86,8 +87,7 @@ export function ParticipantHome({
             {formatCredits(remaining, snapshot.event.currency)}
           </strong>
           <span>
-            z {formatCredits(person.walletBudget, snapshot.event.currency)} na
-            rozdelenie
+            z {formatCredits(totalBudget, snapshot.event.currency)} na rozdelenie
           </span>
         </section>
 
