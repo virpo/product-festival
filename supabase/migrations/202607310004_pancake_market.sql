@@ -61,19 +61,20 @@ create policy pancake_packages_select_authorized
 on public.pancake_packages for select
 to authenticated
 using (
-  public.is_organizer(event_id)
+  public.is_organizer(pancake_packages.event_id)
   or (
     exists (
       select 1
       from public.events event_row
-      where event_row.id = event_id
+      where event_row.id = pancake_packages.event_id
         and event_row.status = 'released'
     )
     and exists (
       select 1
       from public.team_members membership
-      where membership.event_id = event_id
-        and membership.person_id = public.current_person_id(event_id)
+      where membership.event_id = pancake_packages.event_id
+        and membership.person_id =
+          public.current_person_id(pancake_packages.event_id)
     )
   )
 );

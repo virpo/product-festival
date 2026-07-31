@@ -235,6 +235,12 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("public.current_person_id");
     expect(sql).toContain("public.is_organizer");
     expect(sql).toContain(
+      "membership.event_id = pancake_packages.event_id",
+    );
+    expect(sql).toContain(
+      "public.current_person_id(pancake_packages.event_id)",
+    );
+    expect(sql).toContain(
       "revoke insert, update, delete on public.pancake_packages",
     );
     expect(sql).toContain(
