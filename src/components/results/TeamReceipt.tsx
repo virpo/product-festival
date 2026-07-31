@@ -59,13 +59,13 @@ export function TeamReceipt({
         <div className="receipt-total">
           <span>Spolu</span>
           <strong>{formatCredits(total, snapshot.event.currency)}</strong>
-          <small>{signals.length} feedbackov</small>
+          <small>{signals.length} spätných väzieb</small>
         </div>
       </header>
 
       <section className="receipt-signals">
         {signals.length === 0 ? (
-          <div className="empty-state">Tento tím zatiaľ nedostal feedback.</div>
+          <div className="empty-state">Tento tím zatiaľ nedostal spätnú väzbu.</div>
         ) : (
           signals.map((signal) => {
             const author = snapshot.people.find(
@@ -94,7 +94,7 @@ export function TeamReceipt({
                   // Signing the recording failed. Say so rather than falling
                   // through to "investment without a note" — the team would
                   // never learn that voice feedback exists.
-                  <p><AudioLines aria-hidden="true" size={17} />Hlasový feedback sa nepodarilo načítať. Skús obnoviť stránku.</p>
+                  <p><AudioLines aria-hidden="true" size={17} />Hlasovú poznámku sa nepodarilo načítať. Skús obnoviť stránku.</p>
                 ) : null}
                 {!signal.feedbackText && !signal.audioUrl && !signal.audioPath ? (
                   <p><WalletCards aria-hidden="true" size={17} />Investícia bez textovej poznámky</p>

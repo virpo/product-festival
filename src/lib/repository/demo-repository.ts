@@ -1,13 +1,16 @@
 import { deriveEventStats } from "@/lib/domain/stats";
 import type {
+  BonusAward,
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
   Person,
   Signal,
   SignalInput,
+  SignalSaveResult,
   Team,
 } from "@/lib/domain/types";
+import { calculateBonusAwards } from "@/lib/domain/bonuses";
 import {
   validateSignal,
   validateTeamAssignment,
@@ -25,6 +28,7 @@ import {
   type StorageLike,
 } from "./FestivalRepository";
 import { createDemoSnapshot } from "./demo-data";
+const AWARDS_KEY = "product-festival:demo:bonus-awards:v1";
 
 const SNAPSHOT_KEY = "product-festival:demo:v1";
 const PERSON_KEY = "product-festival:current-person:v1";
@@ -90,7 +94,7 @@ export class DemoFestivalRepository implements FestivalRepository {
         // them. Deriving on read keeps stored data authoritative for wallets
         // and signals only.
         this.attachAudioUrls(snapshot);
-        snapshot.stats = deriveEventStats(snapshot);
+        snapshot.stats = deriveEventStats(snapshot, new Date(), this.readAwards());
         return snapshot;
       } catch {
         this.storage.removeItem(SNAPSHOT_KEY);
@@ -152,10 +156,24 @@ export class DemoFestivalRepository implements FestivalRepository {
   private read(): FestivalSnapshot {
     return this.ensureSnapshot();
   }
+  private readAwards(): BonusAward[] {
+    const stored = this.storage.getItem(AWARDS_KEY);
+    if (!stored) return [];
+    try {
+      return JSON.parse(stored) as BonusAward[];
+    } catch {
+      this.storage.removeItem(AWARDS_KEY);
+      return [];
+    }
+  }
+
+  private writeAwards(awards: BonusAward[]) {
+    this.storage.setItem(AWARDS_KEY, JSON.stringify(awards));
+  }
 
   private write(snapshot: FestivalSnapshot): FestivalSnapshot {
     const next = cloneSnapshot(snapshot);
-    next.stats = deriveEventStats(next);
+    next.stats = deriveEventStats(next, new Date(), this.readAwards());
     this.storage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
     this.emit();
     return next;
@@ -178,6 +196,12 @@ export class DemoFestivalRepository implements FestivalRepository {
   async getCurrentPerson(): Promise<Person | null> {
     const id = this.storage.getItem(PERSON_KEY);
     return this.read().people.find((person) => person.id === id) ?? null;
+  }
+  async getPrivateBonusTotal(): Promise<number> {
+    const personId = this.storage.getItem(PERSON_KEY);
+    return this.readAwards()
+      .filter((award) => award.personId === personId)
+      .reduce((sum, award) => sum + award.amount, 0);
   }
 
   subscribe(
@@ -254,8 +278,9 @@ export class DemoFestivalRepository implements FestivalRepository {
   async upsertSignal(
     input: SignalInput,
     audio?: Blob | null,
-  ): Promise<Signal> {
+  ): Promise<SignalSaveResult> {
     const snapshot = this.read();
+    const awards = this.readAwards();
     const normalized = validateSignal(
       {
         ...input,
@@ -264,6 +289,7 @@ export class DemoFestivalRepository implements FestivalRepository {
           (audio ? `demo/${input.investorId}/${input.teamId}.webm` : null),
       },
       snapshot,
+      awards,
     );
     const now = new Date().toISOString();
     const existing = snapshot.signals.find(
@@ -271,6 +297,8 @@ export class DemoFestivalRepository implements FestivalRepository {
         signal.investorId === normalized.investorId &&
         signal.teamId === normalized.teamId,
     );
+    const previousSnapshot = this.storage.getItem(SNAPSHOT_KEY);
+    const previousAwards = this.storage.getItem(AWARDS_KEY);
 
     if (existing) {
       // Follow the path, not the presence of a new blob. Keeping the old URL
@@ -292,8 +320,40 @@ export class DemoFestivalRepository implements FestivalRepository {
           : null;
 
       Object.assign(existing, normalized, { audioUrl, updatedAt: now });
-      this.write(snapshot);
-
+      const shouldAwardAudio =
+        Boolean(normalized.audioPath) &&
+        !awards.some(
+          (award) =>
+            award.personId === normalized.investorId &&
+            award.achievement === "voice-of-the-festival",
+        ) &&
+        !snapshot.signals.some(
+          (signal) =>
+            signal.id !== existing.id &&
+            signal.investorId === normalized.investorId &&
+            Boolean(signal.audioPath),
+        );
+      const audioAwards: BonusAward[] = shouldAwardAudio
+        ? [{
+            id: crypto.randomUUID(),
+            eventId: snapshot.event.id,
+            personId: normalized.investorId,
+            achievement: "voice-of-the-festival",
+            amount: 5,
+            teamId: null,
+            createdAt: now,
+          }]
+        : [];
+      try {
+        this.writeAwards([...awards, ...audioAwards]);
+        this.write(snapshot);
+      } catch (error) {
+        if (previousAwards === null) this.storage.removeItem(AWARDS_KEY);
+        else this.storage.setItem(AWARDS_KEY, previousAwards);
+        if (previousSnapshot === null) this.storage.removeItem(SNAPSHOT_KEY);
+        else this.storage.setItem(SNAPSHOT_KEY, previousSnapshot);
+        throw error;
+      }
       // Register (and revoke any superseded URL) only after the snapshot is
       // persisted. `write()` can throw on a full storage quota, and revoking
       // first would leave the retained recording referenced but unplayable.
@@ -304,7 +364,17 @@ export class DemoFestivalRepository implements FestivalRepository {
         audioUrl?.startsWith("blob:") ? audioUrl : null,
       );
 
-      return structuredClone(existing);
+      return {
+        signal: structuredClone(existing),
+        awards: audioAwards.length
+          ? [{
+              achievement: "voice-of-the-festival",
+              amount: 5,
+              title: "Hlas festivalu!",
+              message: "Tvoja prvá hlasová poznámka dala spätnej väzbe nový rozmer.",
+            }]
+          : [],
+      };
     }
 
     const signalId = crypto.randomUUID();
@@ -316,10 +386,46 @@ export class DemoFestivalRepository implements FestivalRepository {
       createdAt: now,
       updatedAt: now,
     };
+    const receipts = calculateBonusAwards({
+      event: snapshot.event,
+      person: snapshot.people.find((person) => person.id === normalized.investorId)!,
+      teams: snapshot.teams,
+      teamMembers: snapshot.teamMembers,
+      signals: snapshot.signals,
+      awards,
+      candidate: signal,
+      now,
+    });
+    const ownTeamId = snapshot.teamMembers.find(
+      (membership) => membership.personId === normalized.investorId,
+    )?.teamId ?? null;
+    const newAwards: BonusAward[] = receipts.map((receipt) => ({
+      id: crypto.randomUUID(),
+      eventId: snapshot.event.id,
+      personId: normalized.investorId,
+      achievement: receipt.achievement,
+      amount: receipt.amount,
+      teamId:
+        receipt.achievement === "team-joins-in"
+          ? ownTeamId
+          : receipt.achievement === "first-light" || receipt.achievement === "helpful-spotlight"
+            ? signal.teamId
+            : null,
+      createdAt: now,
+    }));
     snapshot.signals.push(signal);
-    this.write(snapshot);
+    try {
+      this.writeAwards([...awards, ...newAwards]);
+      this.write(snapshot);
+    } catch (error) {
+      if (previousAwards === null) this.storage.removeItem(AWARDS_KEY);
+      else this.storage.setItem(AWARDS_KEY, previousAwards);
+      if (previousSnapshot === null) this.storage.removeItem(SNAPSHOT_KEY);
+      else this.storage.setItem(SNAPSHOT_KEY, previousSnapshot);
+      throw error;
+    }
     this.rememberAudioUrl(signalId, signal.audioUrl);
-    return structuredClone(signal);
+    return { signal: structuredClone(signal), awards: receipts };
   }
 
   async removeSignal(investorId: string, teamId: string): Promise<void> {
@@ -440,8 +546,11 @@ export class DemoFestivalRepository implements FestivalRepository {
       const committed = snapshot.signals
         .filter((signal) => signal.investorId === existing.id)
         .reduce((total, signal) => total + signal.amount, 0);
+      const earnedAwards = this.readAwards()
+        .filter((award) => award.eventId === snapshot.event.id && award.personId === existing.id)
+        .reduce((total, award) => total + award.amount, 0);
 
-      if (input.walletBudget < committed) {
+      if (input.walletBudget + earnedAwards < committed) {
         throw new Error("Rozpočet nemôže byť nižší než už rozdelené kredity.");
       }
 
@@ -576,6 +685,7 @@ export class DemoFestivalRepository implements FestivalRepository {
     this.audioUrls.clear();
     this.storage.removeItem(SNAPSHOT_KEY);
     this.storage.removeItem(PERSON_KEY);
+    this.storage.removeItem(AWARDS_KEY);
     this.ensureSnapshot();
     this.emit();
   }

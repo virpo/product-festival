@@ -23,6 +23,7 @@ type ParticipantHomeProps = {
   onSignOut(): Promise<void> | void;
   person: Person;
   snapshot: FestivalSnapshot;
+  privateBonusTotal?: number;
 };
 
 export function ParticipantHome({
@@ -32,9 +33,11 @@ export function ParticipantHome({
   onSignOut,
   person,
   snapshot,
+  privateBonusTotal = 0,
 }: ParticipantHomeProps) {
   const coverage = coverageFor(person.id, snapshot);
-  const remaining = remainingWallet(person.id, snapshot);
+  const remaining = remainingWallet(person.id, snapshot) + privateBonusTotal;
+  const totalBudget = person.walletBudget + privateBonusTotal;
   const signals = snapshot.signals
     .filter((signal) => signal.investorId === person.id)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -63,7 +66,7 @@ export function ParticipantHome({
             ) : released && ownTeam ? (
               <Link className="overview-primary-action" href="/results">
                 <span>
-                  <small>Feedback je odomknutý</small>
+                  <small>Spätná väzba je dostupná</small>
                   <strong>Výsledok môjho tímu</strong>
                 </span>
                 <ArrowRight aria-hidden="true" />
@@ -75,6 +78,7 @@ export function ParticipantHome({
       mode={mode}
       person={person}
       snapshot={snapshot}
+      privateBonusTotal={privateBonusTotal}
     >
       <main className="participant-overview">
         <section className="overview-balance">
@@ -83,8 +87,7 @@ export function ParticipantHome({
             {formatCredits(remaining, snapshot.event.currency)}
           </strong>
           <span>
-            z {formatCredits(person.walletBudget, snapshot.event.currency)} na
-            rozdelenie
+            z {formatCredits(totalBudget, snapshot.event.currency)} na rozdelenie
           </span>
         </section>
 
@@ -135,7 +138,7 @@ export function ParticipantHome({
                     <span className="overview-investment-copy">
                       <strong>{team.name}</strong>
                       <small>
-                        {signal.feedbackText || "Hlasový feedback"}
+                        {signal.feedbackText || "Hlasová poznámka"}
                       </small>
                     </span>
                     <b>

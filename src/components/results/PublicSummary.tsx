@@ -17,12 +17,11 @@ export function PublicSummary({
       <section className="summary-number-grid">
         <article><strong>{stats?.teamCount ?? 0}</strong><span>produktov</span></article>
         <article><strong>{stats?.visitCount ?? 0}</strong><span>vyskúšaní</span></article>
-        <article><strong>{stats?.feedbackCount ?? 0}</strong><span>feedbackov</span></article>
-        <article><strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong><span>signálu</span></article>
+        <article><strong>{stats?.feedbackCount ?? 0}</strong><span>spätných väzieb</span></article>
+        <article><strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong><span>investícií</span></article>
       </section>
       <p className="summary-note">
         Investícia znamená „chcem vidieť, kam sa toto posunie“. Nie je to poradie
-        ani hlasovanie o víťazovi.
       </p>
     </main>
   );

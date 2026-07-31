@@ -54,13 +54,13 @@ export function PublicWall({
         {event.status === "locked" ? (
           <>
             <h1>Investovanie je uzavreté.</h1>
-            <p className="wall-subtitle">Posledná kontrola. Feedback zatiaľ ostáva súkromný.</p>
+            <p className="wall-subtitle">Posledná kontrola. Spätná väzba zatiaľ zostáva súkromná.</p>
           </>
         ) : null}
         {event.status === "released" ? (
           <>
-            <h1>Feedback je odomknutý.</h1>
-            <p className="wall-subtitle">Každý tím ho nájde vo svojom účte.</p>
+            <h1>Spätná väzba je dostupná.</h1>
+            <p className="wall-subtitle">Každý tím ju nájde vo svojom účte.</p>
           </>
         ) : null}
       </section>
@@ -92,7 +92,7 @@ export function PublicWall({
         <article>
           <MessageSquareText aria-hidden="true" />
           <strong>{stats?.feedbackCount ?? 0}</strong>
-          <span>feedbackov</span>
+          <span>spätných väzieb</span>
         </article>
         <article>
           <WalletCards aria-hidden="true" />

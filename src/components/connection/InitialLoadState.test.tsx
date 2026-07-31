@@ -8,12 +8,12 @@ describe("InitialLoadState", () => {
     render(
       <InitialLoadState
         error=""
-        label="Zapínam skener…"
+        label="Spúšťam skener…"
         onRetry={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("Zapínam skener…")).toBeInTheDocument();
+    expect(screen.getByText("Spúšťam skener…")).toBeInTheDocument();
   });
 
   it("turns an initial load failure into a retry action", async () => {

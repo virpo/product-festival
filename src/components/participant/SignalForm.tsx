@@ -31,6 +31,7 @@ type SignalFormProps = {
   existingSignal?: Signal | null;
   onDelete?: () => Promise<void> | void;
   onSave(input: SignalInput, audio?: Blob | null): Promise<void> | void;
+  privateBonusTotal?: number;
 };
 
 const amountPresets = [5, 10, 25, 50];
@@ -44,10 +45,11 @@ export function SignalForm({
   existingSignal = null,
   onDelete,
   onSave,
+  privateBonusTotal = 0,
 }: SignalFormProps) {
   const available = useMemo(
-    () => remainingWallet(person.id, snapshot) + (existingSignal?.amount ?? 0),
-    [existingSignal?.amount, person.id, snapshot],
+    () => remainingWallet(person.id, snapshot) + privateBonusTotal + (existingSignal?.amount ?? 0),
+    [existingSignal?.amount, person.id, privateBonusTotal, snapshot],
   );
   const maximum = Math.min(snapshot.event.maxPerTeam, available);
   const [amount, setAmount] = useState(
@@ -81,7 +83,7 @@ export function SignalForm({
     setError("");
 
     if (!feedback.trim() && !audio && !keepExistingAudio) {
-      setError("Pridaj feedback alebo hlasovú poznámku.");
+      setError("Pridaj text alebo hlasovú poznámku.");
       return;
     }
 
@@ -106,7 +108,7 @@ export function SignalForm({
       setError(
         reason instanceof Error
           ? reason.message
-          : "Feedback sa nepodarilo uložiť.",
+          : "Spätnú väzbu sa nepodarilo uložiť.",
       );
     } finally {
       setSaving(false);
@@ -116,7 +118,7 @@ export function SignalForm({
   async function remove() {
     if (
       !onDelete ||
-      !window.confirm(`Odstrániť investíciu a feedback pre ${team.name}?`)
+      !window.confirm(`Odstrániť investíciu a spätnú väzbu pre ${team.name}?`)
     ) {
       return;
     }
@@ -166,7 +168,7 @@ export function SignalForm({
         </header>
 
         <section className="signal-feedback">
-          <p className="panel-kicker">Feedback</p>
+          <p className="panel-kicker">Spätná väzba</p>
           <AudioRecorder
             existingUrl={
               keepExistingAudio ? existingSignal?.audioUrl ?? null : null
@@ -182,11 +184,11 @@ export function SignalForm({
             Alebo napíš
           </label>
           <textarea
-            aria-label="Napísaný feedback"
+            aria-label="Napísaná spätná väzba"
             className="field-textarea signal-textarea"
             id={`feedback-${team.id}`}
             onChange={(event) => setFeedback(event.target.value)}
-            placeholder="Čo fungovalo? Čo by si zmenil?"
+            placeholder="Čo fungovalo? Čo by sa dalo zlepšiť?"
             rows={3}
             value={feedback}
           />
@@ -279,7 +281,7 @@ export function SignalForm({
                 ? "Ukladám…"
                 : existingSignal
                   ? "Uložiť zmeny"
-                  : "Poslať feedback"}
+                  : "Poslať spätnú väzbu"}
               <ArrowRight aria-hidden="true" size={20} />
             </button>
           </div>

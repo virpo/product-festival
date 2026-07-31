@@ -20,6 +20,10 @@ const investmentProgressMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607300001_investment_progress.sql",
 );
+const festivalSparksMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310002_festival_sparks.sql",
+);
 const walletCoversSignalsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607310001_wallet_covers_signals.sql",
@@ -140,6 +144,7 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("budget_remaining");
     expect(sql).toContain("budget_distributed_percent");
     expect(sql).toContain("p.role <> 'organizer'");
+
     expect(sql).toContain("greatest(");
     // 100% must mean the budget is gone, so the percentage floors below
     // completion instead of rounding up to a full bar. Mirrors
@@ -148,6 +153,22 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("floor(100.0 * distributed / total)");
     expect(sql).not.toContain("round(100.0 * distributed / total)");
     expect(sql).toContain("refresh_event_stats");
+  });
+  it("keeps festival awards private and returns receipts atomically", () => {
+    const sql = readFileSync(festivalSparksMigrationPath, "utf8").toLowerCase();
+    expect(sql).toContain("create table public.bonus_awards");
+    expect(sql).toContain("alter table public.bonus_awards enable row level security");
+    expect(sql).toContain("bonus_awards_select_own");
+    expect(sql).toContain("returns jsonb");
+    expect(sql).toContain("new_awards");
+    expect(sql).toContain("revoke all on function public.save_signal");
+    expect(sql).not.toContain("alter publication supabase_realtime add table public.bonus_awards");
+    expect(sql).toContain("create or replace function public.enforce_wallet_covers_signals");
+    expect(sql).toContain("from public.bonus_awards award");
+    expect(sql).toContain("award.person_id = new.id");
+    expect(sql).toContain("when distributed >= total_budget then 100");
+    expect(sql).toContain("floor(100.0 * distributed / total_budget)");
+    expect(sql).not.toContain("round(100.0 * distributed / total_budget)");
   });
 
   it("keeps a wallet at or above the credits already committed", () => {
@@ -166,9 +187,6 @@ describe("Supabase schema contract", () => {
 
   it("moves the bootstrapped event onto the pancake currency", () => {
     const sql = readFileSync(investmentProgressMigrationPath, "utf8");
-
-    // Both seeds insert with `on conflict do nothing`, so only a forward
-    // migration can change the currency the bootstrap migration already wrote.
     expect(sql).toContain("update public.events");
     expect(sql).toContain("set currency = '🥞'");
     expect(sql).toContain("where slug = 'ai-build-week'");

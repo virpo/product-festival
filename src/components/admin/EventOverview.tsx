@@ -10,9 +10,9 @@ type OverviewCommands = {
 
 const statusLabel: Record<EventStatus, string> = {
   draft: "Príprava",
-  open: "Investovanie beží",
-  locked: "Investovanie uzavreté",
-  released: "Výsledky odomknuté",
+  open: "Investovanie prebieha",
+  locked: "Investovanie je uzavreté",
+  released: "Výsledky sú odomknuté",
 };
 
 export function EventOverview({
@@ -49,7 +49,7 @@ export function EventOverview({
           <strong>{stats?.visitCount ?? 0}</strong>
         </article>
         <article>
-          <span>Feedbacky</span>
+          <span>Spätná väzba</span>
           <strong>{stats?.feedbackCount ?? 0}</strong>
         </article>
         <article>
@@ -66,7 +66,7 @@ export function EventOverview({
           <h2>
             {event.status === "draft" && "Keď sú ľudia a tímy pripravení"}
             {event.status === "open" && "Keď čas vyprší"}
-            {event.status === "locked" && "Keď chcete rozdať feedback"}
+            {event.status === "locked" && "Keď chcete sprístupniť spätnú väzbu"}
             {event.status === "released" && "Festival je uzavretý"}
           </h2>
         </div>
@@ -74,11 +74,11 @@ export function EventOverview({
           <button
             className="admin-primary"
             onClick={() =>
-              void advance("open", "Otvoriť investovanie pre všetkých?")
+              void advance("open", "Spustiť investovanie pre všetkých?")
             }
             type="button"
           >
-            <Play aria-hidden="true" size={18} /> Otvoriť investovanie
+            <Play aria-hidden="true" size={18} /> Spustiť investovanie
           </button>
         ) : null}
         {event.status === "open" ? (
@@ -101,7 +101,7 @@ export function EventOverview({
             onClick={() =>
               void advance(
                 "released",
-                "Odomknúť tímom ich investície a menovitý feedback?",
+                "Sprístupniť tímom ich investície a spätnú väzbu s menami?",
               )
             }
             type="button"

@@ -14,7 +14,7 @@ describe("OrganizerHeader", () => {
       />,
     );
 
-    expect(screen.getByText("Investovanie beží")).toBeInTheDocument();
+    expect(screen.getByText("Investovanie prebieha")).toBeInTheDocument();
     expect(screen.getByText("Peter")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Odhlásiť sa" }));
     expect(onSignOut).toHaveBeenCalledOnce();

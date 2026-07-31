@@ -127,7 +127,7 @@ export function AudioRecorder({
       typeof MediaRecorder === "undefined" ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      failStart("Mikrofón sa nedá použiť. Feedback môžeš napísať.");
+      failStart("Mikrofón sa nedá použiť. Spätnú väzbu môžeš napísať.");
       return;
     }
 
@@ -186,7 +186,7 @@ export function AudioRecorder({
         setState(hasRecording ? "recorded" : "idle");
         return;
       }
-      failStart("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať.");
+      failStart("Mikrofón sa nepodarilo zapnúť. Spätnú väzbu môžeš napísať.");
     }
   }
 
@@ -244,7 +244,7 @@ export function AudioRecorder({
         </div>
       ) : (
         <button
-          aria-label="Nahrať feedback"
+          aria-label="Nahrať spätnú väzbu"
           className="record-button record-button--primary"
           disabled={state === "requesting"}
           onClick={() => void start()}
@@ -258,7 +258,7 @@ export function AudioRecorder({
             </span>
           )}
           <strong>
-            {state === "requesting" ? "Zapínam mikrofón…" : "Nahrať feedback"}
+            {state === "requesting" ? "Zapínam mikrofón…" : "Nahrať spätnú väzbu"}
           </strong>
         </button>
       )}
