@@ -256,6 +256,50 @@ describe("DemoFestivalRepository", () => {
       }),
     ).resolves.toMatchObject({ walletBudget: committed });
   });
+  it("lets earned awards cover an organizer wallet reduction", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("NINA");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 40,
+      feedbackText: "The bonus covers part of this wallet.",
+      audioPath: null,
+    });
+
+    const after = await repo.getSnapshot();
+    const committed = after.signals
+      .filter((signal) => signal.investorId === person.id)
+      .reduce((total, signal) => total + signal.amount, 0);
+    const earned = await repo.getPrivateBonusTotal();
+    const ownTeamId =
+      after.teamMembers.find((member) => member.personId === person.id)
+        ?.teamId ?? null;
+
+    expect(earned).toBeGreaterThan(0);
+    await expect(
+      repo.savePerson({
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        walletBudget: Math.max(0, committed - earned),
+        accessCode: person.accessCode,
+        teamId: ownTeamId,
+      }),
+    ).resolves.toMatchObject({
+      walletBudget: Math.max(0, committed - earned),
+    });
+  });
 
   it("clears the audio url when a recording is removed", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());

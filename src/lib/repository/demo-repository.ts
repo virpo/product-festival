@@ -485,8 +485,11 @@ export class DemoFestivalRepository implements FestivalRepository {
       const committed = snapshot.signals
         .filter((signal) => signal.investorId === existing.id)
         .reduce((total, signal) => total + signal.amount, 0);
+      const earnedAwards = this.readAwards()
+        .filter((award) => award.eventId === snapshot.event.id && award.personId === existing.id)
+        .reduce((total, award) => total + award.amount, 0);
 
-      if (input.walletBudget < committed) {
+      if (input.walletBudget + earnedAwards < committed) {
         throw new Error("Rozpočet nemôže byť nižší než už rozdelené kredity.");
       }
 
