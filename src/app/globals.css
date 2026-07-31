@@ -1600,6 +1600,203 @@ button {
   padding-top: 28px;
 }
 
+.admin-market > .section-heading > svg {
+  color: var(--amber);
+}
+
+.admin-market .section-heading p:last-child {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.admin-market-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.admin-market-totals,
+.admin-market-editor {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.admin-market-totals h3,
+.admin-market-editor h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1rem;
+}
+
+.admin-market-totals > p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.admin-market-totals ul {
+  margin-top: 16px;
+}
+
+.admin-market-totals li {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-market-totals li span,
+.admin-market-totals li small,
+.admin-market-totals li strong {
+  display: block;
+}
+
+.admin-market-totals li small {
+  color: var(--muted);
+  font-size: 0.62rem;
+}
+
+.admin-market-totals li strong,
+.admin-market-totals li b {
+  margin-top: 3px;
+  font-family: var(--font-display), sans-serif;
+}
+
+.admin-market-totals li b {
+  color: var(--cyan);
+}
+
+.admin-market-package-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.admin-market-package-list fieldset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px auto;
+  align-items: end;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.admin-market-package-list legend {
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: 0.64rem;
+}
+
+.admin-market-package-list label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.admin-market-order {
+  display: flex;
+  gap: 5px;
+}
+
+.admin-market-order button {
+  width: 34px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.admin-market-order button:disabled {
+  opacity: 0.35;
+}
+
+.admin-market-notice {
+  min-height: 1.5em;
+  margin-top: 10px;
+  font-size: 0.74rem;
+}
+
+.admin-market-notice .is-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success);
+}
+
+.admin-market-notice .is-error {
+  color: var(--danger);
+}
+
+.admin-market-fulfillment {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.admin-market-fulfillment article {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.55fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  padding: 15px 18px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.admin-market-fulfillment article > div:first-child span,
+.admin-market-fulfillment article > div:first-child strong,
+.admin-market-fulfillment article > div:first-child small {
+  display: block;
+}
+
+.admin-market-fulfillment article > div:first-child span,
+.admin-market-fulfillment article small {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.admin-market-fulfillment article > div:first-child strong {
+  margin: 3px 0;
+  font-family: var(--font-display), sans-serif;
+}
+
+.admin-market-choice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+}
+
+.admin-market-choice > strong {
+  min-width: 0;
+}
+
+.admin-market-choice > span {
+  color: var(--amber);
+  font-family: var(--font-display), sans-serif;
+}
+
+.admin-market-choice > small {
+  grid-column: 1 / -1;
+}
+
+.admin-market-unselected {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
 .event-state {
   min-height: 76px;
   display: flex;
@@ -3666,6 +3863,19 @@ button {
   .admin-tabs button {
     flex: 0 0 auto;
     padding: 0 12px;
+  }
+
+  .admin-market-layout,
+  .admin-market-fulfillment article {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-market-package-list fieldset {
+    grid-template-columns: 1fr 100px;
+  }
+
+  .admin-market-order {
+    grid-column: 1 / -1;
   }
 
   .admin-stat-grid {

@@ -716,7 +716,7 @@ Expected: FAIL because the admin market component does not exist.
 
 - [ ] **Step 3: Implement pre-release totals and catalogue editor**
 
-Copy snapshot packages into local editable drafts whenever the persisted package array changes. Sort active teams by `number`, derive every amount with `teamReceivedAmount`, and never sort by amount. Render provisional copy for `open`, final copy for `locked`, and neutral zero/current copy for `draft`.
+Derive a stable persisted-catalogue signature from each row’s name, price, and position; do not sync drafts from package-array identity. Track whether the form is dirty and apply a changed persisted signature only while pristine. Live team-total refetches and the refresh that follows a rejected `runCommand` must preserve unsaved drafts. After a successful save, mark the form pristine while keeping the submitted values. Sort active teams by `number`, derive every amount with `teamReceivedAmount`, and never sort by amount. Render provisional copy for `open`, final copy for `locked`, and neutral zero/current copy for `draft`.
 
 Move rows by swapping adjacent array entries and then rewriting `position: index + 1`. On save, call `validatePancakeCatalog`, await `onSave`, and show `Palacinkové balíčky sú uložené.`; preserve the local drafts and show a specific inline error on failure.
 

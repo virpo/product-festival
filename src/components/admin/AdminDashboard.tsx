@@ -4,17 +4,19 @@ import type {
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
+  PancakePackageDraft,
   Person,
 } from "@/lib/domain/types";
 import type {
   SavePersonInput,
   SaveTeamInput,
 } from "@/lib/repository/FestivalRepository";
-import { LayoutDashboard, Settings, UsersRound, Workflow } from "lucide-react";
+import { LayoutDashboard, Settings, Store, UsersRound, Workflow } from "lucide-react";
 import { useState } from "react";
 import { EventOverview } from "./EventOverview";
 import { EventSettings } from "./EventSettings";
 import { PeopleTable } from "./PeopleTable";
+import { PancakeMarketAdmin } from "./PancakeMarketAdmin";
 import { TeamsTable } from "./TeamsTable";
 
 export type FestivalContextValueForTests = {
@@ -25,17 +27,19 @@ export type FestivalContextValueForTests = {
     resetDemo(): Promise<void>;
     savePerson(input: SavePersonInput): Promise<void>;
     saveTeam(input: SaveTeamInput): Promise<void>;
+    savePancakeCatalog(packages: PancakePackageDraft[]): Promise<void>;
     updateEvent(patch: Partial<FestivalEvent>): Promise<void>;
   };
 };
 
 type AdminCommands = FestivalContextValueForTests["commands"];
-type Tab = "overview" | "teams" | "people" | "settings";
+type Tab = "overview" | "teams" | "people" | "market" | "settings";
 
 const tabs: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Prehľad", icon: LayoutDashboard },
   { id: "teams", label: "Tímy", icon: Workflow },
   { id: "people", label: "Ľudia", icon: UsersRound },
+  { id: "market", label: "Burza", icon: Store },
   { id: "settings", label: "Nastavenia", icon: Settings },
 ];
 
@@ -92,6 +96,12 @@ export function AdminDashboard({
           <PeopleTable
             commands={commands}
             currentPerson={currentPerson}
+            snapshot={snapshot}
+          />
+        ) : null}
+        {tab === "market" ? (
+          <PancakeMarketAdmin
+            onSave={commands.savePancakeCatalog}
             snapshot={snapshot}
           />
         ) : null}
