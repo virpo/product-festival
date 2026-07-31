@@ -105,15 +105,35 @@ export class DemoFestivalRepository implements FestivalRepository {
   /**
    * Replace serialized audio URLs with the live object URL for this document,
    * or null when none exists. Seeded non-`blob:` URLs are left untouched.
+   *
+   * Membership of the map is not enough to re-attach: another tab sharing this
+   * storage can clear or delete the recording, and only the writing tab updates
+   * its own map. Following `audioPath` keeps a deleted recording from coming
+   * back to life on the released receipt, which renders from `audioUrl` alone.
    */
   private attachAudioUrls(snapshot: FestivalSnapshot) {
+    const present = new Set<string>();
+
     for (const signal of snapshot.signals) {
-      const live = this.audioUrls.get(signal.id);
+      present.add(signal.id);
+      const live = signal.audioPath ? this.audioUrls.get(signal.id) : undefined;
 
       if (live) {
         signal.audioUrl = live;
       } else if (signal.audioUrl?.startsWith("blob:")) {
         signal.audioUrl = null;
+      }
+    }
+
+    // Release URLs whose signal lost its recording or was removed elsewhere.
+    for (const [signalId, url] of this.audioUrls) {
+      const signal = present.has(signalId)
+        ? snapshot.signals.find((candidate) => candidate.id === signalId)
+        : undefined;
+
+      if (!signal?.audioPath) {
+        URL.revokeObjectURL(url);
+        this.audioUrls.delete(signalId);
       }
     }
   }
@@ -260,10 +280,18 @@ export class DemoFestivalRepository implements FestivalRepository {
       // when `audioPath` is cleared leaves a removed recording playable on the
       // released receipt, which renders from `audioUrl` alone. The Supabase
       // adapter deletes the stored object in the same situation.
+      // Prefer this document's object URL, but keep a durable non-`blob:` URL
+      // when there is none, so an amount-only edit cannot strip playback from a
+      // stored or seeded recording.
+      const retained =
+        this.audioUrls.get(existing.id) ??
+        (existing.audioUrl && !existing.audioUrl.startsWith("blob:")
+          ? existing.audioUrl
+          : null);
       const audioUrl = audio
         ? URL.createObjectURL(audio)
         : normalized.audioPath
-          ? (this.audioUrls.get(existing.id) ?? null)
+          ? retained
           : null;
 
       Object.assign(existing, normalized, { audioUrl, updatedAt: now });

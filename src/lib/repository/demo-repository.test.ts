@@ -345,6 +345,86 @@ describe("DemoFestivalRepository", () => {
     expect(signal.audioPath).toBeTruthy();
   });
 
+  it("does not resurrect a recording another tab removed", async () => {
+    const storage = memoryStorage();
+    const tabA = new DemoFestivalRepository(storage);
+    const tabB = new DemoFestivalRepository(storage);
+    const person = await tabA.claimPerson("PETER");
+    const snapshot = await tabA.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    const base = {
+      investorId: person.id,
+      teamId: team.id,
+      amount: 5,
+      feedbackText: "Written note.",
+    };
+
+    await tabA.upsertSignal(
+      { ...base, audioPath: "pending-recording" },
+      new Blob(["recording"], { type: "audio/webm" }),
+    );
+    // Tab A holds the live object URL; tab B clears the recording.
+    await tabB.upsertSignal({ ...base, audioPath: null });
+
+    const signal = (await tabA.getSnapshot()).signals.find(
+      (candidate) =>
+        candidate.investorId === person.id && candidate.teamId === team.id,
+    )!;
+
+    expect(signal.audioPath).toBeNull();
+    expect(signal.audioUrl).toBeNull();
+  });
+
+  it("keeps a durable audio url through an amount-only edit", async () => {
+    const storage = memoryStorage();
+    const seed = new DemoFestivalRepository(storage);
+    const person = await seed.claimPerson("PETER");
+    const snapshot = await seed.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+    const created = await seed.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 5,
+      feedbackText: "Note.",
+      audioPath: "stored/recording.webm",
+    });
+    // Simulate a stored snapshot whose recording has a durable, non-blob URL.
+    const stored = JSON.parse(
+      storage.getItem("product-festival:demo:v1")!,
+    ) as typeof snapshot;
+    stored.signals.find((s) => s.id === created.id)!.audioUrl =
+      "https://example.com/recording.webm";
+    storage.setItem("product-festival:demo:v1", JSON.stringify(stored));
+
+    const repo = new DemoFestivalRepository(storage);
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 9,
+      feedbackText: "Note.",
+      audioPath: "stored/recording.webm",
+    });
+
+    const signal = (await repo.getSnapshot()).signals.find(
+      (candidate) => candidate.id === created.id,
+    )!;
+    expect(signal.audioUrl).toBe("https://example.com/recording.webm");
+  });
+
   it("re-derives stats for a snapshot stored by an earlier release", async () => {
     const storage = memoryStorage();
     const seeded = await new DemoFestivalRepository(storage).getSnapshot();
