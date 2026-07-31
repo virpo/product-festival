@@ -1,7 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
-import { ConnectionNotice } from "./ConnectionNotice";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ConnectionNotice, FestivalConnectionNotice } from "./ConnectionNotice";
+
+const mocks = vi.hoisted(() => ({
+  pathname: { current: "/" },
+  festival: { current: {} as Record<string, unknown> },
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => mocks.pathname.current,
+}));
+
+vi.mock("@/lib/repository/useFestival", () => ({
+  useFestival: () => mocks.festival.current,
+}));
 
 describe("ConnectionNotice", () => {
   it("shows stale data and lets the user retry immediately", async () => {
@@ -77,5 +90,58 @@ describe("ConnectionNotice", () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("FestivalConnectionNotice", () => {
+  beforeEach(() => {
+    mocks.pathname.current = "/";
+    mocks.festival.current = {
+      commands: { refresh: vi.fn() },
+      connection: {
+        status: "retrying",
+        stale: true,
+        attempt: 1,
+        message: "Spojenie vypadlo.",
+      },
+      currentPerson: { id: "p1", role: "participant" },
+    };
+  });
+
+  function docked() {
+    render(<FestivalConnectionNotice />);
+    return screen.getByRole("status").className.includes(
+      "connection-notice--docked",
+    );
+  }
+
+  it("lifts the notice on the participant screens that carry a dock", () => {
+    expect(docked()).toBe(true);
+  });
+
+  it("leaves the access-code entry screen alone", () => {
+    // `/` renders JoinScreen until somebody signs in — no dock, no snackbar.
+    mocks.festival.current.currentPerson = null;
+    expect(docked()).toBe(false);
+  });
+
+  it("leaves the organizer home alone", () => {
+    mocks.festival.current.currentPerson = { id: "o1", role: "organizer" };
+    expect(docked()).toBe(false);
+  });
+
+  it("lifts the notice on the scanner and team screens", () => {
+    mocks.pathname.current = "/scan";
+    expect(docked()).toBe(true);
+  });
+
+  it("covers the team route", () => {
+    mocks.pathname.current = "/t/ABC";
+    expect(docked()).toBe(true);
+  });
+
+  it("leaves organizer routes and the wall alone", () => {
+    mocks.pathname.current = "/admin";
+    expect(docked()).toBe(false);
   });
 });

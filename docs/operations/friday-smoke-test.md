@@ -9,15 +9,29 @@ The frontend degrades quietly if it runs ahead of the schema: missing
 back to the legacy invested total instead of reporting an error.
 
 - [ ] Apply `202607300001_investment_progress.sql` and
-  `202607310001_wallet_covers_signals.sql` with `npx supabase db push` **before**
-  deploying the frontend.
-- [ ] `202607310001` sets a 3s `lock_timeout` on purpose, so that creating its
-  trigger fails fast instead of queueing ahead of every reader of
-  `public.people`. Under load it can abort with
-  `canceling statement due to lock timeout`. That is safe: the file is
-  idempotent (`create or replace`, `drop trigger if exists`), so re-run it in a
-  quieter moment. If you pasted it into the SQL editor rather than pushing it,
-  run `reset lock_timeout;` in that session afterwards.
+  `202607310001_wallet_covers_signals.sql` **before** deploying the frontend.
+- [ ] Preflight before pushing. A fresh clone has no project ref (`supabase/.temp/`
+  is gitignored), and `db push` replays every migration the remote has no record
+  of — including `202607240001`, whose bare `create type` / `create table`
+  statements are not idempotent and will abort the push. So:
+
+  ```sh
+  npx supabase link --project-ref <ref>
+  npx supabase migration list
+  ```
+
+  Only `202607300001` and `202607310001` may show as pending. If an earlier
+  version shows pending, it is a history gap, not missing schema — reconcile it
+  with `npx supabase migration repair --status applied <version>` rather than
+  letting the push replay it. Then `npx supabase db push`.
+- [ ] On an unlinked machine, paste the two files into the SQL editor instead.
+- [ ] `202607310001` sets a 3s `lock_timeout` on purpose, so creating its trigger
+  fails fast instead of queueing ahead of every reader of `public.people`. Under
+  load it can abort with `canceling statement due to lock timeout`. That is
+  safe: the file is idempotent (`create or replace`, `drop trigger if exists`),
+  so re-run it in a quieter moment. No manual cleanup is needed — the file
+  resets `lock_timeout` itself, and an aborted run rolls the setting back with
+  its transaction.
 - [ ] Check that nobody already holds less credit than they have invested. The
   migration raises a `wallet below committed signals` notice per offender, but
   that output is easy to miss, so run this in the Supabase SQL editor and
@@ -94,6 +108,9 @@ back to the legacy invested total instead of reporting an error.
 - [ ] Restore connectivity. The warning clears and fresh room data appears.
 - [ ] Repeat while editing an investment on `/t/<code>` at 390×844. The warning
   sits above the dock and does not cover **Uložiť zmeny** or the delete action.
+- [ ] Repeat on the participant overview `/` and on the access-code screen. The
+  warning clears the dock on the overview, and on the entry screen it tucks into
+  the corner rather than floating over the code field.
 - [ ] Save an investment while fully offline. It must **fail** on the form with
   an inline error and no confirmation — a write that never reached the server
   must never look saved.
