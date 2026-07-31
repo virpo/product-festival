@@ -27,7 +27,7 @@ describe("SignalForm", () => {
       />,
     );
 
-    const record = screen.getByRole("button", { name: "Nahrať feedback" });
+    const record = screen.getByRole("button", { name: "Nahrať spätnú väzbu" });
     const amount = screen.getByLabelText("Suma");
     expect(
       record.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -80,7 +80,7 @@ describe("SignalForm", () => {
 
     await user.click(screen.getByRole("button", { name: /Poslať/ }));
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Pridaj feedback");
+    expect(screen.getByRole("alert")).toHaveTextContent("Pridaj text alebo hlasovú poznámku.");
   });
 
   it("edits and removes an existing investment in the same form", async () => {
@@ -102,7 +102,7 @@ describe("SignalForm", () => {
     );
 
     expect(screen.getByLabelText("Suma")).toHaveValue(15);
-    expect(screen.getByLabelText("Napísaný feedback")).toHaveValue(
+    expect(screen.getByLabelText("Napísaná spätná väzba")).toHaveValue(
       existingSignal.feedbackText,
     );
     expect(

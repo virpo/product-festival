@@ -36,6 +36,7 @@ type ParticipantFrameProps = {
   mode?: "demo" | "live" | "supabase";
   person: Person;
   snapshot: FestivalSnapshot;
+  privateBonusTotal?: number;
 };
 
 export function ParticipantFrame({
@@ -45,8 +46,9 @@ export function ParticipantFrame({
   mode = "live",
   person,
   snapshot,
+  privateBonusTotal = 0,
 }: ParticipantFrameProps) {
-  const remaining = remainingWallet(person.id, snapshot);
+  const remaining = remainingWallet(person.id, snapshot) + privateBonusTotal;
   const left = back ? (
     <Link
       aria-label={`Späť na ${back.label}`}

@@ -6,6 +6,7 @@ import type {
   FestivalSnapshot,
   Person,
   SignalInput,
+  SignalSaveResult,
 } from "@/lib/domain/types";
 import {
   createContext,
@@ -40,6 +41,7 @@ type FestivalContextValue = {
   repository: FestivalRepository | null;
   mode: "demo" | "supabase";
   snapshot: FestivalSnapshot | null;
+  privateBonusTotal: number;
   currentPerson: Person | null;
   loading: boolean;
   error: string;
@@ -50,7 +52,7 @@ type FestivalContextValue = {
     signOut(): Promise<void>;
     touchPresence(personId: string): Promise<void>;
     markVisit(teamId: string): Promise<void>;
-    upsertSignal(input: SignalInput, audio?: Blob | null): Promise<void>;
+    upsertSignal(input: SignalInput, audio?: Blob | null): Promise<SignalSaveResult>;
     removeSignal(investorId: string, teamId: string): Promise<void>;
     saveTeam(input: SaveTeamInput): Promise<void>;
     removeTeam(teamId: string): Promise<void>;
@@ -77,6 +79,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     useState<FestivalRepository | null>(null);
   const [snapshot, setSnapshot] = useState<FestivalSnapshot | null>(null);
   const [currentPerson, setCurrentPerson] = useState<Person | null>(null);
+  const [privateBonusTotal, setPrivateBonusTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [connection, setConnection] = useState<ConnectionState>({
@@ -126,14 +129,16 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
     // This fetch observes everything committed up to now.
     snapshotDirty.current = false;
     fetchStarts.current += 1;
-
     const request = (async () => {
-      const [nextSnapshot, nextPerson] = await Promise.all([
+
+      const [nextSnapshot, nextPerson, nextBonusTotal] = await Promise.all([
         repository.getSnapshot(),
         repository.getCurrentPerson(),
+        repository.getPrivateBonusTotal?.() ?? Promise.resolve(0),
       ]);
       setSnapshot(nextSnapshot);
       setCurrentPerson(nextPerson);
+      setPrivateBonusTotal(nextBonusTotal);
       setError("");
     })()
       .catch((reason) => {
@@ -426,12 +431,12 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
   }, [currentPersonId, refreshWithRecovery, repository]);
 
   const commands = useMemo<FestivalContextValue["commands"]>(() => {
-    async function run(action: () => Promise<unknown>) {
+    async function run<T>(action: () => Promise<T>): Promise<T> {
       if (!repository) {
         throw new Error("Festival sa ešte načítava.");
       }
 
-      await runCommand(action, refreshAfterWrite);
+      return runCommand(action, refreshAfterWrite);
     }
 
     return {
@@ -449,7 +454,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
         await run(() => repository!.markVisit(teamId));
       },
       async upsertSignal(input, audio) {
-        await run(() => repository!.upsertSignal(input, audio));
+        return run(() => repository!.upsertSignal(input, audio));
       },
       async removeSignal(investorId, teamId) {
         await run(() => repository!.removeSignal(investorId, teamId));
@@ -483,6 +488,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       repository,
       mode: repository?.mode ?? "demo",
       snapshot,
+      privateBonusTotal,
       currentPerson,
       loading,
       error,
@@ -496,6 +502,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       error,
       loading,
       repository,
+      privateBonusTotal,
       snapshot,
     ],
   );

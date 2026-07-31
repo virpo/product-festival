@@ -3,10 +3,11 @@
 import { AppShell } from "@/components/brand/AppShell";
 import { ParticipantDock } from "@/components/participant/ParticipantDock";
 import { ParticipantFrame } from "@/components/participant/ParticipantFrame";
+import { BonusReveal } from "@/components/participant/BonusReveal";
 import { SignalForm } from "@/components/participant/SignalForm";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { isOwnTeam } from "@/lib/domain/rules";
-import type { SignalInput } from "@/lib/domain/types";
+import type { SignalInput, SignalSaveResult } from "@/lib/domain/types";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -21,8 +22,10 @@ export default function TeamPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { commands, connection, currentPerson, error, mode, snapshot } =
+  const { commands, connection, currentPerson, error, mode, privateBonusTotal, snapshot } =
     useFestival();
+  const [savedAwards, setSavedAwards] = useState<SignalSaveResult["awards"]>([]);
+  const [savedAmount, setSavedAmount] = useState<number | null>(null);
   // Keyed by person and team: this route component can be preserved across
   // `[code]` changes, and a plain boolean would then suppress the next team's
   // visit for the rest of the session.
@@ -142,11 +145,12 @@ export default function TeamPage() {
         mode={mode}
         person={currentPerson}
         snapshot={snapshot}
+        privateBonusTotal={privateBonusTotal}
       >
         <main className="route-message">
           <p className="eyebrow">Kód {code}</p>
-          <h1>Tento tím nepoznáme.</h1>
-          <Link className="primary-button" href="/scan">Skenovať znova</Link>
+          <h1>Tento tím sme nenašli.</h1>
+          <Link className="primary-button" href="/scan">Naskenovať znova</Link>
         </main>
       </ParticipantFrame>
     );
@@ -172,11 +176,12 @@ export default function TeamPage() {
         mode={mode}
         person={currentPerson}
         snapshot={snapshot}
+        privateBonusTotal={privateBonusTotal}
       >
         <main className="route-message own-team-message">
           <p className="eyebrow">{team.name}</p>
           <h1>Toto je tvoj tím.</h1>
-          <p>Do vlastného tímu neinvestuješ.</p>
+          <p>Do vlastného tímu investovať nemôžeš.</p>
         </main>
       </ParticipantFrame>
     );
@@ -195,10 +200,12 @@ export default function TeamPage() {
   const teamCode = team.code;
 
   async function save(input: SignalInput, audio?: Blob | null) {
-    await commands.upsertSignal(input, audio);
-    // Carry the amount that was just written. The post-write refresh is
-    // allowed to fail, so the overview cannot rely on the snapshot already
-    // holding this signal.
+    const result = await commands.upsertSignal(input, audio);
+    if (result?.awards?.length) {
+      setSavedAwards(result.awards);
+      setSavedAmount(input.amount);
+      return;
+    }
     router.push(
       `/?saved=${encodeURIComponent(teamCode)}&amount=${input.amount}`,
     );
@@ -215,8 +222,24 @@ export default function TeamPage() {
       mode={mode}
       person={currentPerson}
       snapshot={snapshot}
+      privateBonusTotal={
+        privateBonusTotal -
+        (savedAwards.length
+          ? savedAwards.reduce((total, award) => total + award.amount, 0)
+          : 0)
+      }
     >
-      {snapshot.event.status === "open" ? (
+      {savedAwards.length > 0 ? (
+        <BonusReveal
+          awards={savedAwards}
+          currency={snapshot.event.currency}
+          onContinue={() =>
+            router.push(
+              `/?saved=${encodeURIComponent(teamCode)}${savedAmount === null ? "" : `&amount=${savedAmount}`}`,
+            )
+          }
+        />
+      ) : snapshot.event.status === "open" ? (
         <SignalForm
           backHref={backHref}
           backLabel={formBackLabel}
@@ -225,6 +248,7 @@ export default function TeamPage() {
           onSave={save}
           person={currentPerson}
           snapshot={snapshot}
+          privateBonusTotal={privateBonusTotal}
           team={team}
         />
       ) : (

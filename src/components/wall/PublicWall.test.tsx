@@ -19,7 +19,7 @@ describe("PublicWall", () => {
     render(<PublicWall event={snapshot.event} stats={stats} />);
 
     expect(screen.getByText("64")).toBeInTheDocument();
-    expect(screen.getByText("feedbackov")).toBeInTheDocument();
+    expect(screen.getByText("spätných väzieb")).toBeInTheDocument();
     expect(screen.getByText("420🥞")).toBeInTheDocument();
     expect(screen.queryByText("🥞420")).not.toBeInTheDocument();
     expect(
@@ -72,7 +72,7 @@ describe("PublicWall", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("0%")).not.toBeInTheDocument();
     // The rest of the wall still renders.
-    expect(screen.getByText("feedbackov")).toBeInTheDocument();
+    expect(screen.getByText("spätných väzieb")).toBeInTheDocument();
     // And the invested tile must not claim zero: the pre-migration schema
     // populates total_invested even though every budget column is missing.
     expect(

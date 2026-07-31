@@ -5,9 +5,9 @@ import Link from "next/link";
 
 const statusLabels: Record<EventStatus, string> = {
   draft: "Príprava",
-  open: "Investovanie beží",
-  locked: "Investovanie uzavreté",
-  released: "Výsledky odomknuté",
+  open: "Investovanie prebieha",
+  locked: "Investovanie je uzavreté",
+  released: "Výsledky sú odomknuté",
 };
 
 type OrganizerHeaderProps = {

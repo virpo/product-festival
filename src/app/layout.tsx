@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s · Product Festival",
   },
   description:
-    "Try every product, leave useful feedback, and invest fake money without a public leaderboard.",
+    "Vyskúšaj každý produkt, zanechaj užitočnú spätnú väzbu a rozdeľuj fiktívne kredity bez verejného rebríčka.",
   icons: {
     icon: "/icon.svg",
   },

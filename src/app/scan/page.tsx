@@ -8,14 +8,14 @@ import { useFestival } from "@/lib/repository/useFestival";
 import Link from "next/link";
 
 export default function ScanPage() {
-  const { commands, currentPerson, error, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, privateBonusTotal, snapshot } = useFestival();
 
   if (!snapshot) {
     return (
       <AppShell mode={mode}>
         <InitialLoadState
           error={error}
-          label="Zapínam skener…"
+          label="Spúšťam skener…"
           onRetry={commands.refresh}
         />
       </AppShell>
@@ -39,6 +39,7 @@ export default function ScanPage() {
       mode={mode}
       person={currentPerson}
       snapshot={snapshot}
+      privateBonusTotal={privateBonusTotal}
     >
       <QrScanner />
     </ParticipantFrame>

@@ -1,4 +1,5 @@
 import type {
+  BonusReceipt,
   EventStats,
   EventStatus,
   FestivalEvent,
@@ -7,6 +8,7 @@ import type {
   PersonRole,
   Signal,
   SignalInput,
+  SignalSaveResult,
   Team,
   TeamMember,
   Visit,
@@ -231,6 +233,17 @@ function mapStats(value: unknown): EventStats | null {
   };
 }
 
+
+function mapBonusReceipt(value: unknown): BonusReceipt {
+  const row = value as Row;
+  return {
+    achievement: stringValue(row.achievement) as BonusReceipt["achievement"],
+    amount: numberValue(row.amount),
+    title: stringValue(row.title),
+    message: stringValue(row.message),
+  };
+}
+
 function slugify(value: string): string {
   return value
     .normalize("NFKD")
@@ -380,6 +393,18 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     fail(error, "Prihlásenie sa nepodarilo načítať.");
     return data ? mapPerson(data) : null;
   }
+  async getPrivateBonusTotal(): Promise<number> {
+    const event = await this.getEvent();
+    const person = await this.getCurrentPerson();
+    if (!person) return 0;
+    const { data, error } = await this.client
+      .from("bonus_awards")
+      .select("amount")
+      .eq("event_id", event.id)
+      .eq("person_id", person.id);
+    fail(error, "Bonus sa nepodarilo načítať.");
+    return (data ?? []).reduce((sum, row) => sum + numberValue((row as Row).amount), 0);
+  }
 
   subscribe(
     listener: () => void,
@@ -507,7 +532,10 @@ export class SupabaseFestivalRepository implements FestivalRepository {
     return stringValue(data?.audio_path) === audioPath;
   }
 
-  async upsertSignal(input: SignalInput, audio?: Blob | null): Promise<Signal> {
+  async upsertSignal(
+    input: SignalInput,
+    audio?: Blob | null,
+  ): Promise<SignalSaveResult> {
     const event = await this.getEvent();
     const { data: existingData } = await this.client
       .from("signals")
@@ -567,8 +595,12 @@ export class SupabaseFestivalRepository implements FestivalRepository {
         .from("festival-feedback")
         .remove([existing.audioPath]);
     }
-    const signal = mapSignal(data);
-    return (await this.withSignedAudio([signal]))[0];
+    const payload = (data && typeof data === "object" ? data : {}) as Row;
+    const savedSignal = mapSignal(payload.signal ?? data);
+    const awards = Array.isArray(payload.new_awards)
+      ? payload.new_awards.map(mapBonusReceipt)
+      : [];
+    return { signal: (await this.withSignedAudio([savedSignal]))[0], awards };
   }
 
   async removeSignal(investorId: string, teamId: string): Promise<void> {

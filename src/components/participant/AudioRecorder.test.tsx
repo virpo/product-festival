@@ -51,7 +51,7 @@ describe("AudioRecorder microphone lifecycle", () => {
     );
 
     const { unmount } = render(<AudioRecorder onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať spätnú väzbu" }));
 
     unmount();
     await act(async () => {
@@ -81,7 +81,7 @@ describe("AudioRecorder microphone lifecycle", () => {
     const onChange = vi.fn();
 
     render(<AudioRecorder onChange={onChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať spätnú väzbu" }));
     await act(async () => {
       grant();
     });
@@ -120,7 +120,7 @@ describe("AudioRecorder microphone lifecycle", () => {
         readCancelToken={() => token.current}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať spätnú väzbu" }));
 
     token.current += 1;
     await act(async () => {
@@ -162,7 +162,7 @@ describe("AudioRecorder microphone lifecycle", () => {
     // The failure is reported, but the recording that is still attached to the
     // signal must remain visible and deletable.
     expect(
-      screen.getByText("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať."),
+      screen.getByText("Mikrofón sa nepodarilo zapnúť. Spätnú väzbu môžeš napísať."),
     ).toBeInTheDocument();
     const removeButton = screen.getByRole("button", {
       name: "Odstrániť nahrávku",
@@ -202,7 +202,7 @@ describe("AudioRecorder microphone lifecycle", () => {
     );
 
     render(<AudioRecorder onChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Nahrať feedback" }));
+    fireEvent.click(screen.getByRole("button", { name: "Nahrať spätnú väzbu" }));
 
     await act(async () => {
       grant();
@@ -210,7 +210,7 @@ describe("AudioRecorder microphone lifecycle", () => {
 
     expect(track.stop).toHaveBeenCalled();
     expect(
-      screen.getByText("Mikrofón sa nepodarilo zapnúť. Feedback môžeš napísať."),
+      screen.getByText("Mikrofón sa nepodarilo zapnúť. Spätnú väzbu môžeš napísať."),
     ).toBeInTheDocument();
   });
 });

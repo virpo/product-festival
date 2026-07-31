@@ -125,7 +125,7 @@ describe("validateSignal", () => {
         },
         makeSnapshot(),
       ),
-    ).toThrow("Pridaj feedback alebo hlasovú poznámku.");
+    ).toThrow("Pridaj text alebo hlasovú poznámku.");
   });
 
   it("allows feedback-only signals", () => {

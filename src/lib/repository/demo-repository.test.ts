@@ -99,7 +99,7 @@ describe("DemoFestivalRepository", () => {
         accessCode: mentor.accessCode,
         teamId: snapshot.teams[2].id,
       }),
-    ).rejects.toThrow("Tím už nemožno zmeniť po odoslaní feedbacku.");
+    ).rejects.toThrow("Tím už nemožno zmeniť po odoslaní spätnej väzby.");
   });
 
   it("does not remove or demote the current organizer", async () => {
@@ -133,28 +133,45 @@ describe("DemoFestivalRepository", () => {
     expect((await repo.getSnapshot()).event.status).toBe("released");
   });
 
+  it("clears private bonuses when resetting demo data", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("NINA");
+    const team = (await repo.getSnapshot()).teams.find((candidate) => candidate.code === "GARDEN4")!;
+    await repo.upsertSignal({ investorId: person.id, teamId: team.id, amount: 0, feedbackText: "A useful first look.", audioPath: null });
+    expect(await repo.getPrivateBonusTotal()).toBeGreaterThan(0);
+    await repo.resetDemo();
+    expect(await repo.getPrivateBonusTotal()).toBe(0);
+  });
+
   it("runs the participant flow through edit, lock, and release", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
-    const person = await repo.claimPerson("PETER");
+    const person = await repo.claimPerson("NINA");
     const team = (await repo.getSnapshot()).teams.find(
-      (candidate) => candidate.code === "LEDGER8",
+      (candidate) => candidate.code === "GARDEN4",
     )!;
-
+    const baselineTotal = (await repo.getSnapshot()).stats!.budgetTotal;
     await repo.markVisit(team.id);
-    await repo.upsertSignal({
+
+    const firstResult = await repo.upsertSignal({
       investorId: person.id,
       teamId: team.id,
       amount: 37,
       feedbackText: "The result makes sense. Shorten the first screen.",
       audioPath: null,
     });
-    await repo.upsertSignal({
+    expect(firstResult.awards.map((award) => award.achievement)).toEqual([
+      "first-spark",
+      "team-joins-in",
+      "first-light",
+    ]);
+    const editResult = await repo.upsertSignal({
       investorId: person.id,
       teamId: team.id,
       amount: 38,
       feedbackText: "The result makes sense. Shorten the first screen.",
       audioPath: null,
     });
+    expect(editResult.awards).toEqual([]);
 
     const openSnapshot = await repo.getSnapshot();
     expect(
@@ -168,7 +185,9 @@ describe("DemoFestivalRepository", () => {
           signal.investorId === person.id && signal.teamId === team.id,
       ),
     ).toMatchObject({ amount: 38 });
-    expect(remainingWallet(person.id, openSnapshot)).toBe(47);
+    expect(await repo.getPrivateBonusTotal()).toBe(20);
+    expect(openSnapshot.stats!.budgetTotal).toBe(baselineTotal + 20);
+    expect(remainingWallet(person.id, openSnapshot) + 20).toBe(82);
 
     await repo.advanceEvent("locked");
     await expect(
@@ -237,6 +256,50 @@ describe("DemoFestivalRepository", () => {
       }),
     ).resolves.toMatchObject({ walletBudget: committed });
   });
+  it("lets earned awards cover an organizer wallet reduction", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("NINA");
+    const snapshot = await repo.getSnapshot();
+    const team = snapshot.teams.find(
+      (candidate) =>
+        !snapshot.teamMembers.some(
+          (membership) =>
+            membership.teamId === candidate.id &&
+            membership.personId === person.id,
+        ),
+    )!;
+
+    await repo.upsertSignal({
+      investorId: person.id,
+      teamId: team.id,
+      amount: 40,
+      feedbackText: "The bonus covers part of this wallet.",
+      audioPath: null,
+    });
+
+    const after = await repo.getSnapshot();
+    const committed = after.signals
+      .filter((signal) => signal.investorId === person.id)
+      .reduce((total, signal) => total + signal.amount, 0);
+    const earned = await repo.getPrivateBonusTotal();
+    const ownTeamId =
+      after.teamMembers.find((member) => member.personId === person.id)
+        ?.teamId ?? null;
+
+    expect(earned).toBeGreaterThan(0);
+    await expect(
+      repo.savePerson({
+        id: person.id,
+        name: person.name,
+        role: person.role,
+        walletBudget: Math.max(0, committed - earned),
+        accessCode: person.accessCode,
+        teamId: ownTeamId,
+      }),
+    ).resolves.toMatchObject({
+      walletBudget: Math.max(0, committed - earned),
+    });
+  });
 
   it("clears the audio url when a recording is removed", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
@@ -261,7 +324,7 @@ describe("DemoFestivalRepository", () => {
       },
       new Blob(["recording"], { type: "audio/webm" }),
     );
-    expect(withAudio.audioUrl).toBeTruthy();
+    expect(withAudio.signal.audioUrl).toBeTruthy();
 
     const removed = await repo.upsertSignal({
       investorId: person.id,
@@ -271,8 +334,8 @@ describe("DemoFestivalRepository", () => {
       audioPath: null,
     });
 
-    expect(removed.audioPath).toBeNull();
-    expect(removed.audioUrl).toBeNull();
+    expect(removed.signal.audioPath).toBeNull();
+    expect(removed.signal.audioUrl).toBeNull();
   });
 
   it("keeps a new recording playable across the post-save refresh", async () => {
@@ -406,7 +469,7 @@ describe("DemoFestivalRepository", () => {
     const stored = JSON.parse(
       storage.getItem("product-festival:demo:v1")!,
     ) as typeof snapshot;
-    stored.signals.find((s) => s.id === created.id)!.audioUrl =
+    stored.signals.find((s) => s.id === created.signal.id)!.audioUrl =
       "https://example.com/recording.webm";
     storage.setItem("product-festival:demo:v1", JSON.stringify(stored));
 
@@ -420,7 +483,7 @@ describe("DemoFestivalRepository", () => {
     });
 
     const signal = (await repo.getSnapshot()).signals.find(
-      (candidate) => candidate.id === created.id,
+      (candidate) => candidate.id === created.signal.id,
     )!;
     expect(signal.audioUrl).toBe("https://example.com/recording.webm");
   });
