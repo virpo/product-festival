@@ -23,6 +23,7 @@ type ParticipantHomeProps = {
   onSignOut(): Promise<void> | void;
   person: Person;
   snapshot: FestivalSnapshot;
+  privateBonusTotal?: number;
 };
 
 export function ParticipantHome({
@@ -32,9 +33,10 @@ export function ParticipantHome({
   onSignOut,
   person,
   snapshot,
+  privateBonusTotal = 0,
 }: ParticipantHomeProps) {
   const coverage = coverageFor(person.id, snapshot);
-  const remaining = remainingWallet(person.id, snapshot);
+  const remaining = remainingWallet(person.id, snapshot) + privateBonusTotal;
   const signals = snapshot.signals
     .filter((signal) => signal.investorId === person.id)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
@@ -75,6 +77,7 @@ export function ParticipantHome({
       mode={mode}
       person={person}
       snapshot={snapshot}
+      privateBonusTotal={privateBonusTotal}
     >
       <main className="participant-overview">
         <section className="overview-balance">

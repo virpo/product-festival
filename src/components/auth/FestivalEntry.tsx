@@ -18,6 +18,7 @@ export function FestivalEntry() {
     currentPerson,
     error,
     mode,
+    privateBonusTotal,
     snapshot,
   } = useFestival();
 
@@ -78,6 +79,7 @@ export function FestivalEntry() {
         onSignOut={commands.signOut}
         person={currentPerson}
         snapshot={snapshot}
+        privateBonusTotal={privateBonusTotal}
       />
     );
   }

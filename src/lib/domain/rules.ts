@@ -1,4 +1,5 @@
 import type {
+  BonusAward,
   FestivalSnapshot,
   Signal,
   SignalInput,
@@ -15,6 +16,7 @@ export class FestivalRuleError extends Error {
 export function remainingWallet(
   personId: string,
   snapshot: FestivalSnapshot,
+  awards: BonusAward[] = [],
 ): number {
   const person = snapshot.people.find((item) => item.id === personId);
 
@@ -25,8 +27,11 @@ export function remainingWallet(
   const spent = snapshot.signals
     .filter((signal) => signal.investorId === personId)
     .reduce((sum, signal) => sum + signal.amount, 0);
+  const earned = awards
+    .filter((award) => award.personId === personId)
+    .reduce((sum, award) => sum + award.amount, 0);
 
-  return person.walletBudget - spent;
+  return person.walletBudget + earned - spent;
 }
 
 export function isOwnTeam(
@@ -94,10 +99,10 @@ export function validateTeamAssignment(
     );
   }
 }
-
 export function validateSignal(
   input: SignalInput,
   snapshot: FestivalSnapshot,
+  awards: BonusAward[] = [],
 ): SignalInput {
   if (snapshot.event.status !== "open") {
     throw new FestivalRuleError("Investovanie je zatvorené.");
@@ -143,7 +148,7 @@ export function validateSignal(
       signal.investorId === input.investorId &&
       signal.teamId === input.teamId,
   );
-  const available = remainingWallet(input.investorId, snapshot)
+  const available = remainingWallet(input.investorId, snapshot, awards)
     + (existing?.amount ?? 0);
 
   if (input.amount > available) {

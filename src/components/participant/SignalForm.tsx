@@ -31,6 +31,7 @@ type SignalFormProps = {
   existingSignal?: Signal | null;
   onDelete?: () => Promise<void> | void;
   onSave(input: SignalInput, audio?: Blob | null): Promise<void> | void;
+  privateBonusTotal?: number;
 };
 
 const amountPresets = [5, 10, 25, 50];
@@ -44,10 +45,11 @@ export function SignalForm({
   existingSignal = null,
   onDelete,
   onSave,
+  privateBonusTotal = 0,
 }: SignalFormProps) {
   const available = useMemo(
-    () => remainingWallet(person.id, snapshot) + (existingSignal?.amount ?? 0),
-    [existingSignal?.amount, person.id, snapshot],
+    () => remainingWallet(person.id, snapshot) + privateBonusTotal + (existingSignal?.amount ?? 0),
+    [existingSignal?.amount, person.id, privateBonusTotal, snapshot],
   );
   const maximum = Math.min(snapshot.event.maxPerTeam, available);
   const [amount, setAmount] = useState(

@@ -1,4 +1,5 @@
 import type {
+  BonusAward,
   Coverage,
   EventStats,
   FestivalSnapshot,
@@ -50,18 +51,25 @@ function emptyRoleParticipation(): Record<PersonRole, number> {
     observer: 0,
   };
 }
-
 export function deriveEventStats(
   snapshot: FestivalSnapshot,
   now = new Date(),
+  bonusAwards: BonusAward[] = [],
 ): EventStats {
   const activeCutoff = now.getTime() - 10 * 60 * 1000;
   const investors = snapshot.people.filter(
     (person) => person.role !== "organizer",
   );
   const investorIds = new Set(investors.map((person) => person.id));
-  const budgetTotal = investors
-    .reduce((total, person) => total + person.walletBudget, 0);
+  const budgetTotal = investors.reduce(
+    (total, person) =>
+      total +
+      person.walletBudget +
+      bonusAwards
+        .filter((award) => award.personId === person.id)
+        .reduce((sum, award) => sum + award.amount, 0),
+    0,
+  );
   const budgetDistributed = snapshot.signals
     .filter((signal) => investorIds.has(signal.investorId))
     .reduce((total, signal) => total + signal.amount, 0);

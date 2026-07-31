@@ -3,10 +3,11 @@
 import { AppShell } from "@/components/brand/AppShell";
 import { ParticipantDock } from "@/components/participant/ParticipantDock";
 import { ParticipantFrame } from "@/components/participant/ParticipantFrame";
+import { BonusReveal } from "@/components/participant/BonusReveal";
 import { SignalForm } from "@/components/participant/SignalForm";
 import { InitialLoadState } from "@/components/connection/InitialLoadState";
 import { isOwnTeam } from "@/lib/domain/rules";
-import type { SignalInput } from "@/lib/domain/types";
+import type { SignalInput, SignalSaveResult } from "@/lib/domain/types";
 import { useFestival } from "@/lib/repository/useFestival";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -21,8 +22,9 @@ export default function TeamPage() {
   const params = useParams<{ code: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { commands, connection, currentPerson, error, mode, snapshot } =
+  const { commands, connection, currentPerson, error, mode, privateBonusTotal, snapshot } =
     useFestival();
+  const [savedAwards, setSavedAwards] = useState<SignalSaveResult["awards"]>([]);
   // Keyed by person and team: this route component can be preserved across
   // `[code]` changes, and a plain boolean would then suppress the next team's
   // visit for the rest of the session.
@@ -142,6 +144,7 @@ export default function TeamPage() {
         mode={mode}
         person={currentPerson}
         snapshot={snapshot}
+        privateBonusTotal={privateBonusTotal}
       >
         <main className="route-message">
           <p className="eyebrow">Kód {code}</p>
@@ -172,6 +175,7 @@ export default function TeamPage() {
         mode={mode}
         person={currentPerson}
         snapshot={snapshot}
+        privateBonusTotal={privateBonusTotal}
       >
         <main className="route-message own-team-message">
           <p className="eyebrow">{team.name}</p>
@@ -195,7 +199,11 @@ export default function TeamPage() {
   const teamCode = team.code;
 
   async function save(input: SignalInput, audio?: Blob | null) {
-    await commands.upsertSignal(input, audio);
+    const result = await commands.upsertSignal(input, audio);
+    if (result?.awards?.length) {
+      setSavedAwards(result.awards);
+      return;
+    }
     router.push(`/?saved=${encodeURIComponent(teamCode)}`);
   }
 
@@ -209,9 +217,16 @@ export default function TeamPage() {
       back={{ href: backHref, label: headerBackLabel }}
       mode={mode}
       person={currentPerson}
+      privateBonusTotal={privateBonusTotal}
       snapshot={snapshot}
     >
-      {snapshot.event.status === "open" ? (
+      {savedAwards.length > 0 ? (
+        <BonusReveal
+          awards={savedAwards}
+          currency={snapshot.event.currency}
+          onContinue={() => router.push(`/?saved=${encodeURIComponent(teamCode)}`)}
+        />
+      ) : snapshot.event.status === "open" ? (
         <SignalForm
           backHref={backHref}
           backLabel={formBackLabel}
@@ -220,6 +235,7 @@ export default function TeamPage() {
           onSave={save}
           person={currentPerson}
           snapshot={snapshot}
+          privateBonusTotal={privateBonusTotal}
           team={team}
         />
       ) : (

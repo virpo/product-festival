@@ -133,28 +133,45 @@ describe("DemoFestivalRepository", () => {
     expect((await repo.getSnapshot()).event.status).toBe("released");
   });
 
+  it("clears private bonuses when resetting demo data", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const person = await repo.claimPerson("NINA");
+    const team = (await repo.getSnapshot()).teams.find((candidate) => candidate.code === "GARDEN4")!;
+    await repo.upsertSignal({ investorId: person.id, teamId: team.id, amount: 0, feedbackText: "A useful first look.", audioPath: null });
+    expect(await repo.getPrivateBonusTotal()).toBeGreaterThan(0);
+    await repo.resetDemo();
+    expect(await repo.getPrivateBonusTotal()).toBe(0);
+  });
+
   it("runs the participant flow through edit, lock, and release", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
-    const person = await repo.claimPerson("PETER");
+    const person = await repo.claimPerson("NINA");
     const team = (await repo.getSnapshot()).teams.find(
-      (candidate) => candidate.code === "LEDGER8",
+      (candidate) => candidate.code === "GARDEN4",
     )!;
-
+    const baselineTotal = (await repo.getSnapshot()).stats!.budgetTotal;
     await repo.markVisit(team.id);
-    await repo.upsertSignal({
+
+    const firstResult = await repo.upsertSignal({
       investorId: person.id,
       teamId: team.id,
       amount: 37,
       feedbackText: "The result makes sense. Shorten the first screen.",
       audioPath: null,
     });
-    await repo.upsertSignal({
+    expect(firstResult.awards.map((award) => award.achievement)).toEqual([
+      "first-spark",
+      "team-joins-in",
+      "first-light",
+    ]);
+    const editResult = await repo.upsertSignal({
       investorId: person.id,
       teamId: team.id,
       amount: 38,
       feedbackText: "The result makes sense. Shorten the first screen.",
       audioPath: null,
     });
+    expect(editResult.awards).toEqual([]);
 
     const openSnapshot = await repo.getSnapshot();
     expect(
@@ -168,7 +185,9 @@ describe("DemoFestivalRepository", () => {
           signal.investorId === person.id && signal.teamId === team.id,
       ),
     ).toMatchObject({ amount: 38 });
-    expect(remainingWallet(person.id, openSnapshot)).toBe(47);
+    expect(await repo.getPrivateBonusTotal()).toBe(20);
+    expect(openSnapshot.stats!.budgetTotal).toBe(baselineTotal + 20);
+    expect(remainingWallet(person.id, openSnapshot) + 20).toBe(82);
 
     await repo.advanceEvent("locked");
     await expect(

@@ -1,13 +1,16 @@
 import { deriveEventStats } from "@/lib/domain/stats";
 import type {
+  BonusAward,
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
   Person,
   Signal,
   SignalInput,
+  SignalSaveResult,
   Team,
 } from "@/lib/domain/types";
+import { calculateBonusAwards } from "@/lib/domain/bonuses";
 import {
   validateSignal,
   validateTeamAssignment,
@@ -25,6 +28,7 @@ import {
   type StorageLike,
 } from "./FestivalRepository";
 import { createDemoSnapshot } from "./demo-data";
+const AWARDS_KEY = "product-festival:demo:bonus-awards:v1";
 
 const SNAPSHOT_KEY = "product-festival:demo:v1";
 const PERSON_KEY = "product-festival:current-person:v1";
@@ -92,10 +96,24 @@ export class DemoFestivalRepository implements FestivalRepository {
   private read(): FestivalSnapshot {
     return this.ensureSnapshot();
   }
+  private readAwards(): BonusAward[] {
+    const stored = this.storage.getItem(AWARDS_KEY);
+    if (!stored) return [];
+    try {
+      return JSON.parse(stored) as BonusAward[];
+    } catch {
+      this.storage.removeItem(AWARDS_KEY);
+      return [];
+    }
+  }
+
+  private writeAwards(awards: BonusAward[]) {
+    this.storage.setItem(AWARDS_KEY, JSON.stringify(awards));
+  }
 
   private write(snapshot: FestivalSnapshot): FestivalSnapshot {
     const next = cloneSnapshot(snapshot);
-    next.stats = deriveEventStats(next);
+    next.stats = deriveEventStats(next, new Date(), this.readAwards());
     this.storage.setItem(SNAPSHOT_KEY, JSON.stringify(next));
     this.emit();
     return next;
@@ -118,6 +136,12 @@ export class DemoFestivalRepository implements FestivalRepository {
   async getCurrentPerson(): Promise<Person | null> {
     const id = this.storage.getItem(PERSON_KEY);
     return this.read().people.find((person) => person.id === id) ?? null;
+  }
+  async getPrivateBonusTotal(): Promise<number> {
+    const personId = this.storage.getItem(PERSON_KEY);
+    return this.readAwards()
+      .filter((award) => award.personId === personId)
+      .reduce((sum, award) => sum + award.amount, 0);
   }
 
   subscribe(
@@ -194,8 +218,9 @@ export class DemoFestivalRepository implements FestivalRepository {
   async upsertSignal(
     input: SignalInput,
     audio?: Blob | null,
-  ): Promise<Signal> {
+  ): Promise<SignalSaveResult> {
     const snapshot = this.read();
+    const awards = this.readAwards();
     const normalized = validateSignal(
       {
         ...input,
@@ -204,6 +229,7 @@ export class DemoFestivalRepository implements FestivalRepository {
           (audio ? `demo/${input.investorId}/${input.teamId}.webm` : null),
       },
       snapshot,
+      awards,
     );
     const now = new Date().toISOString();
     const existing = snapshot.signals.find(
@@ -218,7 +244,7 @@ export class DemoFestivalRepository implements FestivalRepository {
         updatedAt: now,
       });
       this.write(snapshot);
-      return structuredClone(existing);
+      return { signal: structuredClone(existing), awards: [] };
     }
 
     const signal: Signal = {
@@ -229,9 +255,29 @@ export class DemoFestivalRepository implements FestivalRepository {
       createdAt: now,
       updatedAt: now,
     };
+    const receipts = calculateBonusAwards({
+      event: snapshot.event,
+      person: snapshot.people.find((person) => person.id === normalized.investorId)!,
+      teams: snapshot.teams,
+      teamMembers: snapshot.teamMembers,
+      signals: snapshot.signals,
+      awards,
+      candidate: signal,
+      now,
+    });
+    const newAwards: BonusAward[] = receipts.map((receipt) => ({
+      id: crypto.randomUUID(),
+      eventId: snapshot.event.id,
+      personId: normalized.investorId,
+      achievement: receipt.achievement,
+      amount: receipt.amount,
+      teamId: receipt.achievement === "helpful-spotlight" ? signal.teamId : null,
+      createdAt: now,
+    }));
     snapshot.signals.push(signal);
+    this.writeAwards([...awards, ...newAwards]);
     this.write(snapshot);
-    return structuredClone(signal);
+    return { signal: structuredClone(signal), awards: receipts };
   }
 
   async removeSignal(investorId: string, teamId: string): Promise<void> {
@@ -466,6 +512,7 @@ export class DemoFestivalRepository implements FestivalRepository {
   async resetDemo(): Promise<void> {
     this.storage.removeItem(SNAPSHOT_KEY);
     this.storage.removeItem(PERSON_KEY);
+    this.storage.removeItem(AWARDS_KEY);
     this.ensureSnapshot();
     this.emit();
   }

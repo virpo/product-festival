@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 export default function ResultsPage() {
-  const { commands, currentPerson, error, mode, snapshot } = useFestival();
+  const { commands, currentPerson, error, mode, privateBonusTotal, snapshot } = useFestival();
   const ownTeamId =
     currentPerson &&
     snapshot?.teamMembers.find((item) => item.personId === currentPerson.id)?.teamId;
@@ -96,6 +96,7 @@ export default function ResultsPage() {
       mode={mode}
       person={currentPerson}
       snapshot={snapshot}
+      privateBonusTotal={privateBonusTotal}
     >
       {content}
     </ParticipantFrame>

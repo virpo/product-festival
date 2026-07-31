@@ -4,8 +4,8 @@ import type {
   FestivalSnapshot,
   Person,
   PersonRole,
-  Signal,
   SignalInput,
+  SignalSaveResult,
   Team,
 } from "@/lib/domain/types";
 
@@ -53,6 +53,7 @@ export type FestivalRepository = {
   readonly mode: RepositoryMode;
   getSnapshot(): Promise<FestivalSnapshot>;
   getCurrentPerson(): Promise<Person | null>;
+  getPrivateBonusTotal(): Promise<number>;
   subscribe(
     listener: () => void,
     connectionListener?: (status: RepositoryConnectionStatus) => void,
@@ -64,7 +65,7 @@ export type FestivalRepository = {
   signOut(): Promise<void>;
   touchPresence(personId: string): Promise<void>;
   markVisit(teamId: string): Promise<void>;
-  upsertSignal(input: SignalInput, audio?: Blob | null): Promise<Signal>;
+  upsertSignal(input: SignalInput, audio?: Blob | null): Promise<SignalSaveResult>;
   removeSignal(investorId: string, teamId: string): Promise<void>;
   saveTeam(input: SaveTeamInput): Promise<Team>;
   removeTeam(teamId: string): Promise<void>;

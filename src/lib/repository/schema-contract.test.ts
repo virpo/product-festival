@@ -20,6 +20,10 @@ const investmentProgressMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607300001_investment_progress.sql",
 );
+const festivalSparksMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310001_festival_sparks.sql",
+);
 
 describe("Supabase schema contract", () => {
   it("defines protected tables and aggregate realtime state", () => {
@@ -136,8 +140,20 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("budget_remaining");
     expect(sql).toContain("budget_distributed_percent");
     expect(sql).toContain("p.role <> 'organizer'");
+
     expect(sql).toContain("greatest(");
     expect(sql).toContain("least(100");
     expect(sql).toContain("refresh_event_stats");
   });
+  it("keeps festival awards private and returns receipts atomically", () => {
+    const sql = readFileSync(festivalSparksMigrationPath, "utf8").toLowerCase();
+    expect(sql).toContain("create table public.bonus_awards");
+    expect(sql).toContain("alter table public.bonus_awards enable row level security");
+    expect(sql).toContain("bonus_awards_select_own");
+    expect(sql).toContain("returns jsonb");
+    expect(sql).toContain("new_awards");
+    expect(sql).toContain("revoke all on function public.save_signal");
+    expect(sql).not.toContain("alter publication supabase_realtime add table public.bonus_awards");
+  });
+
 });

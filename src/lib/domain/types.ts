@@ -78,6 +78,41 @@ export type SignalInput = Pick<
   "investorId" | "teamId" | "amount" | "feedbackText" | "audioPath"
 >;
 
+export type BonusAchievement =
+  | "first-spark"
+  | "team-joins-in"
+  | "first-light"
+  | "helpful-spotlight"
+  | "curious-explorer"
+  | "festival-sweep"
+  | "voice-of-the-festival";
+
+export type BonusAward = {
+  id: string;
+  eventId: string;
+  personId: string;
+  achievement: BonusAchievement;
+  amount: number;
+  teamId: string | null;
+  createdAt: string;
+};
+
+export type BonusReceipt = {
+  achievement: BonusAchievement;
+  amount: number;
+  title: string;
+  message: string;
+};
+
+export type SignalSaveResult = {
+  signal: Signal;
+  awards: BonusReceipt[];
+};
+
+export type PrivateAwards = {
+  awards: BonusAward[];
+};
+
 export type RoleParticipation = Record<PersonRole, number>;
 
 export type EventStats = {
