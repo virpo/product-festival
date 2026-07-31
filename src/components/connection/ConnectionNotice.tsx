@@ -7,12 +7,15 @@ import { useFestival } from "@/lib/repository/useFestival";
 
 type ConnectionNoticeProps = {
   connection: ConnectionState;
+  /** Raise the notice above a participant dock and the save snackbar. */
+  docked?: boolean;
   onRetry: () => Promise<void>;
   variant?: "app" | "wall";
 };
 
 export function ConnectionNotice({
   connection,
+  docked = false,
   onRetry,
   variant = "app",
 }: ConnectionNoticeProps) {
@@ -22,7 +25,9 @@ export function ConnectionNotice({
 
   return (
     <aside
-      className={`connection-notice connection-notice--${variant}`}
+      className={`connection-notice connection-notice--${variant}${
+        docked ? " connection-notice--docked" : ""
+      }`}
       role="status"
     >
       <WifiOff aria-hidden="true" size={variant === "wall" ? 22 : 18} />
@@ -45,10 +50,18 @@ export function FestivalConnectionNotice() {
   const { commands, connection } = useFestival();
   const variant =
     pathname === "/wall" || pathname === "/summary" ? "wall" : "app";
+  // Only the participant screens carry the sticky dock and the save snackbar
+  // that the notice has to clear. Lifting it on entry, admin or results screens
+  // would float it over unrelated content and risk clipping it on a short
+  // viewport.
+  const docked =
+    variant === "app" &&
+    (pathname === "/" || pathname === "/scan" || pathname.startsWith("/t/"));
 
   return (
     <ConnectionNotice
       connection={connection}
+      docked={docked}
       onRetry={commands.refresh}
       variant={variant}
     />

@@ -24,7 +24,11 @@ type AudioRecorderProps = {
   hasExisting?: boolean;
   value?: Blob | null;
   onChange(value: Blob | null): void;
-  /** Reports whether the microphone is being requested or is recording. */
+  /**
+   * Reports whether a capture is in flight. Only `recording` counts: during
+   * `requesting` nothing has been captured yet, so saving loses nothing and the
+   * participant must stay free to type instead if they never answer the prompt.
+   */
   onBusyChange?(busy: boolean): void;
   onRemoveExisting?(): void;
 };
@@ -61,7 +65,7 @@ export function AudioRecorder({
   }, [onBusyChange]);
 
   useEffect(() => {
-    busyRef.current?.(state === "requesting" || state === "recording");
+    busyRef.current?.(state === "recording");
   }, [state]);
 
   useEffect(() => {

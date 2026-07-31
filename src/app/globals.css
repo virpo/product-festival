@@ -1,4 +1,8 @@
 :root {
+  /* Shared by the save snackbar and the connection notice so the two
+     bottom-fixed participant surfaces cannot drift into each other. */
+  --snackbar-bottom: 108px;
+  --snackbar-min-height: 52px;
   --bg: #0b0b0d;
   --surface: #151517;
   --surface-raised: #1b1b1e;
@@ -676,24 +680,28 @@ button {
 /*
   Participant screens carry a sticky dock at bottom 0 holding the primary action
   (scan, save, delete). The notice is fixed with z-index 100 against the dock's
-  30, so at the default 16px offset it sits on top of those controls and
-  swallows taps — exactly when the connection is already bad.
+  30, so at the default offset it sits on top of those controls and swallows
+  taps — exactly when the connection is already bad. Applied only on the routes
+  that actually have a dock, so entry/admin/results screens keep the low offset
+  and cannot clip the notice on a short viewport.
 
-  The offset has to clear two things, not one:
+  The offset clears two things:
 
-  1. The TALLEST dock, which is the signal-form edit dock, not the overview:
-     13px dock padding-top (<=640px) + 58px save row + 7px delete margin
-     + 40px delete row = 118px above the safe area.
-  2. The save snackbar, which occupies 108px..160px above the safe area and has
-     the LOWER z-index. A failed post-write refresh renders both at once — the
-     write succeeds, the redirect shows the confirmation, and the failed refresh
-     raises the notice — so colocating them would hide the confirmation in the
-     one case it was built for.
-
-  160px + a 12px gap = 172px. The wall variant keeps its own offset.
+  1. The tallest dock. `.participant-dock` is `padding: 16px 0 max(18px, safe)`,
+     reduced to 13px padding-top at <=640px, so the content box tops out at
+     16 + 58 (save) + 7 + 40 (delete) = 121px above the safe area on wide
+     screens and 118px on narrow ones.
+  2. The save snackbar, at --snackbar-bottom with --snackbar-min-height, which
+     has the LOWER z-index. A failed post-write refresh renders both at once,
+     so colocating them would hide the confirmation in the one case it exists
+     for. The snackbar wins the overlap if it grows past its min-height (see
+     its own z-index), and this offset keeps the common case clean.
 */
-.connection-notice--app {
-  bottom: calc(172px + env(safe-area-inset-bottom));
+.connection-notice--docked {
+  bottom: calc(
+    var(--snackbar-bottom) + var(--snackbar-min-height) + 12px +
+      env(safe-area-inset-bottom)
+  );
 }
 
 .connection-notice--wall {
@@ -2842,10 +2850,13 @@ button {
 .festival-snackbar {
   position: fixed;
   right: 50%;
-  bottom: calc(108px + env(safe-area-inset-bottom));
-  z-index: 70;
+  bottom: calc(var(--snackbar-bottom) + env(safe-area-inset-bottom));
+  /* Above the connection notice: if a long team name wraps the snackbar past
+     its min-height the two overlap, and the transient confirmation is the one
+     that must stay readable. */
+  z-index: 110;
   width: min(440px, calc(100% - 32px));
-  min-height: 52px;
+  min-height: var(--snackbar-min-height);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3052,6 +3063,12 @@ button {
 .signal-dock {
   width: min(680px, 100%);
   margin: 0 auto;
+}
+
+/* Explains the disabled save while a recording is still running. */
+.signal-dock__hint {
+  margin-top: 7px;
+  text-align: center;
 }
 
 .signal-dock__row {
