@@ -10,9 +10,21 @@ back to the legacy invested total instead of reporting an error.
 
 - [ ] Apply `202607300001_investment_progress.sql` and
   `202607310001_wallet_covers_signals.sql` **before** deploying the frontend.
-- [ ] Watch the `202607310001` output for `wallet below committed signals`
-  notices. Each one names a person whose credit was already lowered below what
-  they invested; fix those wallets in **Ľudia** before opening.
+- [ ] Check that nobody already holds less credit than they have invested. The
+  migration raises a `wallet below committed signals` notice per offender, but
+  that output is easy to miss, so run this in the Supabase SQL editor and
+  require zero rows:
+
+  ```sql
+  select p.id, p.name, p.wallet_budget, sum(s.amount) as committed
+  from public.people p
+  join public.signals s on s.investor_id = p.id
+  group by p.id, p.name, p.wallet_budget
+  having sum(s.amount) > p.wallet_budget;
+  ```
+
+  Any row names a person whose credit was lowered below what they invested.
+  Raise that wallet in **Ľudia** before opening.
 - [ ] Confirm the event currency reads `🥞` and not `$`. The migration only
   rewrites the bootstrap value, and only where that migration has not already
   been applied.
@@ -23,7 +35,8 @@ back to the legacy invested total instead of reporting an error.
   1920×1080.
 - [ ] Prepare two separate organizer people and codes.
 - [ ] Prepare one participant with a team, one participant without that team,
-  and two active teams with printed QR cards.
+  and three active teams with printed QR cards. Three, so the participant still
+  has a second foreign team after the first one is used for written feedback.
 - [ ] Keep the event in `draft`.
 
 ## Identity and administration
@@ -49,10 +62,15 @@ back to the legacy invested total instead of reporting an error.
   investment with a confirmation, and the wallet and aggregate wall update.
 - [ ] Open that investment again from the overview row, change the amount and
   save. There is still one signal for that team.
-- [ ] Record audio feedback for another team and save it. While recording, the
-  save and delete actions stay disabled until you stop.
-- [ ] Re-record over an existing recording, then delete it. The recorder shows
-  no recording and the saved signal keeps none either.
+- [ ] Record audio feedback for a second foreign team and save it.
+- [ ] Reopen that signal and start recording again. **Uložiť zmeny** is disabled
+  with a "Najprv zastav nahrávanie" hint while recording; the delete action
+  stays available. Stop, and the save re-enables.
+- [ ] Re-record over the existing recording, delete it, then **save**. Reopen
+  the signal: no recording is attached. Removal only reaches the database on
+  save, so skipping the save here would leave the original audio in place.
+- [ ] Record and save once more on that signal, so a recording remains for the
+  released-receipt playback check below.
 - [ ] The wall's progress bar rises as credits are distributed and only reads
   100% once nothing is left. The invested figure agrees with the bar.
 - [ ] In **Ľudia**, try lowering a participant's credit below what they have
@@ -65,8 +83,14 @@ back to the legacy invested total instead of reporting an error.
 - [ ] Restore connectivity. The warning clears and fresh room data appears.
 - [ ] Repeat while editing an investment on `/t/<code>` at 390×844. The warning
   sits above the dock and does not cover **Uložiť zmeny** or the delete action.
-- [ ] Save an investment while offline. The confirmation is readable and is not
-  hidden behind the stale-data warning.
+- [ ] Save an investment while fully offline. It must **fail** on the form with
+  an inline error and no confirmation — a write that never reached the server
+  must never look saved.
+- [ ] The overlapping confirmation-plus-warning case needs the opposite state:
+  the write commits and only the follow-up refresh fails. Stage it by tapping
+  save and dropping connectivity immediately afterwards. If both appear, they
+  must be readable and not cover each other. Skip rather than fake this one; it
+  is timing-dependent.
 - [ ] Repeat on `/wall`: the warning is clearly visible from the room, but does
   not cover the main numbers.
 

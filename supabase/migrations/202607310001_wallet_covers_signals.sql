@@ -78,3 +78,7 @@ begin
   end loop;
 end;
 $$;
+
+-- Restore the default so the setting cannot outlive this migration on a
+-- connection that replays the whole directory.
+reset lock_timeout;
