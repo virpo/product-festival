@@ -83,4 +83,22 @@ describe("ResultsPage", () => {
       "pancake-package-7",
     );
   });
+
+  it("keeps an archived team package choice read-only", () => {
+    const festival = mocks.festival.current as {
+      snapshot: FestivalSnapshot;
+    };
+    festival.snapshot.event.status = "released";
+    festival.snapshot.teams.find((team) => team.id === "team-1")!.archived = true;
+    festival.snapshot.pancakePackages[6].price = 35;
+
+    render(<ResultsPage />);
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Vybrať Bryndza + kakaový prášok",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Výber tímu je iba na čítanie.")).toBeInTheDocument();
+  });
 });
