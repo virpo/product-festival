@@ -134,7 +134,7 @@ export function FestivalProvider({ children }: { children: ReactNode }) {
       const [nextSnapshot, nextPerson, nextBonusTotal] = await Promise.all([
         repository.getSnapshot(),
         repository.getCurrentPerson(),
-        repository.getPrivateBonusTotal?.() ?? Promise.resolve(0),
+        repository.getPrivateBonusTotal(),
       ]);
       setSnapshot(nextSnapshot);
       setCurrentPerson(nextPerson);

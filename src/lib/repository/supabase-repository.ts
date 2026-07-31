@@ -98,6 +98,7 @@ function fail(error: { message: string } | null, fallback: string) {
   }
 }
 
+
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -402,6 +403,7 @@ export class SupabaseFestivalRepository implements FestivalRepository {
       .select("amount")
       .eq("event_id", event.id)
       .eq("person_id", person.id);
+    if (error?.code === "PGRST205" || error?.code === "42P01") return 0;
     fail(error, "Bonus sa nepodarilo načítať.");
     return (data ?? []).reduce((sum, row) => sum + numberValue((row as Row).amount), 0);
   }

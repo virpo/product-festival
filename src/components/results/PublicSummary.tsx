@@ -21,7 +21,7 @@ export function PublicSummary({
         <article><strong>{formatCredits(stats?.totalInvested ?? 0, event.currency)}</strong><span>investícií</span></article>
       </section>
       <p className="summary-note">
-        Investícia znamená „chcem vidieť, kam sa toto posunie“. Nie je to poradie
+        Investícia znamená „chcem vidieť, kam sa toto posunie“. Nie je to poradie ani hlasovanie o víťazovi.
       </p>
     </main>
   );

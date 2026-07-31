@@ -3946,12 +3946,13 @@ button {
    }
  }
 
- @media (prefers-reduced-motion: reduce) {
-   .bonus-reveal,
-   .bonus-reveal__spark {
-     animation: none;
-     transition: none;
-   }
+@media (prefers-reduced-motion: reduce) {
+  .bonus-reveal,
+  .bonus-reveal__spark,
+  .bonus-reveal--celebrating .bonus-reveal__spark {
+    animation: none;
+    transition: none;
+  }
 
    .bonus-reveal__confetti {
      display: none;

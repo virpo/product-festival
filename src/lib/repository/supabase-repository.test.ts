@@ -71,9 +71,107 @@ function fakeClient() {
   };
 }
 
+function bonusClient(response: {
+  data: Array<{ amount: number }> | null;
+  error: { code: string; message: string } | null;
+}) {
+  const event = {
+    id: "event-1",
+    name: "Festival",
+    slug: "ai-build-week",
+    status: "open",
+    currency: "$",
+    wallet_default: 100,
+    max_per_team: 50,
+    coverage_target: 75,
+    opens_at: null,
+    locks_at: null,
+    results_released_at: null,
+    created_at: "",
+    updated_at: "",
+  };
+  const person = {
+    id: "person-1",
+    event_id: "event-1",
+    name: "Peter",
+    role: "participant",
+    wallet_budget: 100,
+    access_code: "PETER",
+    auth_user_id: "auth-1",
+    last_seen_at: null,
+    created_at: "",
+  };
+  const bonusQuery = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn(),
+  };
+  bonusQuery.eq
+    .mockReturnValueOnce(bonusQuery)
+    .mockResolvedValueOnce(response);
+  const client = {
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: "auth-1" } } }),
+    },
+    from: vi.fn((table: string) => {
+      if (table === "bonus_awards") return bonusQuery;
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: table === "events" ? event : person,
+          error: null,
+        }),
+        single: vi.fn().mockResolvedValue({
+          data: table === "events" ? event : person,
+          error: null,
+        }),
+      };
+    }),
+  };
+  return client;
+}
+
 describe("SupabaseFestivalRepository", () => {
   it("keeps freshly loaded audio links alive for the full festival", () => {
     expect(AUDIO_URL_TTL_SECONDS).toBe(6 * 60 * 60);
+  });
+
+  it("reads private bonus totals", async () => {
+    const repository = new SupabaseFestivalRepository(
+      bonusClient({
+        data: [{ amount: 5 }, { amount: 10 }],
+        error: null,
+      }) as never,
+      { eventSlug: "ai-build-week" },
+    );
+
+    await expect(repository.getPrivateBonusTotal()).resolves.toBe(15);
+  });
+
+  it("treats a missing bonus-awards schema as zero", async () => {
+    const repository = new SupabaseFestivalRepository(
+      bonusClient({
+        data: null,
+        error: { code: "PGRST205", message: "Could not find the table" },
+      }) as never,
+      { eventSlug: "ai-build-week" },
+    );
+
+    await expect(repository.getPrivateBonusTotal()).resolves.toBe(0);
+  });
+
+  it("rethrows non-schema bonus read failures", async () => {
+    const repository = new SupabaseFestivalRepository(
+      bonusClient({
+        data: null,
+        error: { code: "42501", message: "permission denied" },
+      }) as never,
+      { eventSlug: "ai-build-week" },
+    );
+
+    await expect(repository.getPrivateBonusTotal()).rejects.toThrow(
+      "permission denied",
+    );
   });
 
   it("claims through anonymous auth then claim_person RPC", async () => {
