@@ -50,7 +50,7 @@ Aggregate `budgetTotal` and `budgetRemaining` include earned bonus currency so t
 
 ## UX
 
-After a successful save, the participant sees a short private Festival Spark reveal. Stacked awards appear as one bundle with each reason listed. The reveal is delayed only for presentation; the server decides amounts and eligibility. Reduced-motion users receive the same content without animation. Refreshing or returning to the wall does not replay or expose the receipt.
+After a successful save, the participant sees a short private Festival Spark reveal. Stacked awards appear as one bundle with each reason listed. When the reward appears, one brief burst of cyan, amber, and coral particles crosses the viewport and then disappears; it never loops or blocks interaction. The reveal is delayed only for presentation; the server decides amounts and eligibility. Reduced-motion users receive the same content without the burst or entrance animation. Refreshing or returning to the wall does not replay or expose the receipt.
 
 ## Architecture
 

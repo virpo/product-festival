@@ -17,4 +17,20 @@ describe("BonusReveal", () => {
     await userEvent.click(screen.getByRole("button", { name: "Pokračovať" }));
     expect(onContinue).toHaveBeenCalledOnce();
   });
+
+  it("bursts non-interactive festival confetti around the revealed bonus", async () => {
+    const { container } = render(
+      <BonusReveal awards={awards} currency="🥞" onContinue={vi.fn()} />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "+15 🥞" })).toBeInTheDocument(),
+    );
+
+    const confetti = container.querySelector(".bonus-reveal__confetti");
+    expect(confetti).toHaveAttribute("aria-hidden", "true");
+    expect(
+      confetti?.querySelectorAll(".bonus-reveal__confetti-piece"),
+    ).toHaveLength(30);
+  });
 });
