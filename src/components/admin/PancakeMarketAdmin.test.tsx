@@ -99,10 +99,39 @@ describe("PancakeMarketAdmin", () => {
       screen.getByRole("button", { name: "Posunúť balíček 2 vyššie" }),
     );
 
+
     expect(screen.getByLabelText("Názov balíčka 1")).toHaveValue(
       "Čoko-oriešková plnka + banánová plnka",
     );
     expect(screen.getByLabelText("Cena balíčka 1")).toHaveValue(600);
+  });
+  it("keeps submitted drafts visible until the successful write is refetched", async () => {
+    const user = userEvent.setup();
+    const snapshot = snapshotAt("open");
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <PancakeMarketAdmin onSave={onSave} snapshot={snapshot} />,
+    );
+    const firstName = screen.getByLabelText("Názov balíčka 1");
+    await user.clear(firstName);
+    await user.type(firstName, "Peterov nugát");
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    view.rerender(
+      <PancakeMarketAdmin
+        onSave={onSave}
+        snapshot={structuredClone(snapshot)}
+      />,
+    );
+
+    expect(screen.getByLabelText("Názov balíčka 1")).toHaveValue(
+      "Peterov nugát",
+    );
+    expect(
+      screen.getByText("Palacinkové balíčky sú uložené."),
+    ).toBeInTheDocument();
   });
 
   it("shows read-only fulfillment after release without ranking", () => {

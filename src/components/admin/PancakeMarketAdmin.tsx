@@ -37,7 +37,7 @@ export function PancakeMarketAdmin({
 }: PancakeMarketAdminProps) {
   const persistedDrafts = useMemo(
     () => sortedDrafts(snapshot),
-    [snapshot.pancakePackages],
+    [snapshot],
   );
   const persistedSignature = catalogueSignature(persistedDrafts);
   const appliedSignature = useRef(persistedSignature);
@@ -108,7 +108,6 @@ export function PancakeMarketAdmin({
       await onSave(normalized);
       setDrafts(normalized);
       setDirty(false);
-      appliedSignature.current = catalogueSignature(normalized);
       setMessage("Palacinkové balíčky sú uložené.");
     } catch {
       setError("Nastavenia sa nepodarilo uložiť. Skús to znova.");

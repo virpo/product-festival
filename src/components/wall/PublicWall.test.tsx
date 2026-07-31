@@ -7,6 +7,7 @@ import { PublicWall } from "./PublicWall";
 describe("PublicWall", () => {
   it("shows aggregate room progress without team totals or names", () => {
     const snapshot = createDemoSnapshot(new Date("2026-07-24T10:00:00Z"));
+    snapshot.event.status = "released";
     const stats = {
       ...snapshot.stats!,
       feedbackCount: 64,
@@ -31,6 +32,11 @@ describe("PublicWall", () => {
     expect(screen.queryByText(/75% tímov/i)).not.toBeInTheDocument();
     expect(screen.queryByText("QueueLess")).not.toBeInTheDocument();
     expect(screen.queryByText(/rebríček|poradie/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Nugátová plnka + jahodový kompót"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Vybrané pre tím")).not.toBeInTheDocument();
+    expect(screen.queryByText(/víťaz/i)).not.toBeInTheDocument();
   });
 
   it("reports invested credits from the same pool as the progress bar", () => {
