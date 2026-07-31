@@ -14,6 +14,7 @@ function commands() {
     resetDemo: vi.fn().mockResolvedValue(undefined),
     savePerson: vi.fn().mockResolvedValue(undefined),
     saveTeam: vi.fn().mockResolvedValue(undefined),
+    savePancakeCatalog: vi.fn().mockResolvedValue(undefined),
     updateEvent: vi.fn().mockResolvedValue(undefined),
   } satisfies FestivalContextValueForTests["commands"];
 }
@@ -99,5 +100,21 @@ describe("AdminDashboard", () => {
       screen.queryByRole("button", { name: "Odomknúť výsledky" }),
     ).not.toBeInTheDocument();
     expect(screen.getByText("70🥞")).toBeInTheDocument();
+  });
+
+  it("opens the private pancake market workflow", async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminDashboard
+        commands={commands()}
+        currentPerson={organizer}
+        snapshot={snapshot}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Burza" }));
+
+    expect(screen.getByText("Priebežné sumy tímov")).toBeInTheDocument();
+    expect(screen.getAllByText("35🥞").length).toBeGreaterThan(0);
   });
 });

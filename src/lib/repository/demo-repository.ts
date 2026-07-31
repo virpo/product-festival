@@ -1,14 +1,22 @@
+import {
+  DEFAULT_PANCAKE_PACKAGE_DRAFTS,
+  canTeamAffordPackage,
+  validatePancakeCatalog,
+} from "@/lib/domain/pancake-market";
 import { deriveEventStats } from "@/lib/domain/stats";
 import type {
   BonusAward,
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
+  PancakePackage,
+  PancakePackageDraft,
   Person,
   Signal,
   SignalInput,
   SignalSaveResult,
   Team,
+  TeamPancakeSelection,
 } from "@/lib/domain/types";
 import { calculateBonusAwards } from "@/lib/domain/bonuses";
 import {
@@ -93,6 +101,14 @@ export class DemoFestivalRepository implements FestivalRepository {
         // an anonymous wall never writes, so nothing would ever recompute
         // them. Deriving on read keeps stored data authoritative for wallets
         // and signals only.
+        snapshot.pancakePackages ??= DEFAULT_PANCAKE_PACKAGE_DRAFTS.map(
+          (item) => ({
+            ...item,
+            id: `pancake-package-${item.position}`,
+            eventId: snapshot.event.id,
+          }),
+        );
+        snapshot.pancakeSelections ??= [];
         this.attachAudioUrls(snapshot);
         snapshot.stats = deriveEventStats(snapshot, new Date(), this.readAwards());
         return snapshot;
@@ -639,6 +655,96 @@ export class DemoFestivalRepository implements FestivalRepository {
         teamId,
       });
     }
+  }
+
+  async savePancakeCatalog(
+    packages: PancakePackageDraft[],
+  ): Promise<PancakePackage[]> {
+    const snapshot = this.read();
+    const currentPersonId = this.storage.getItem(PERSON_KEY);
+    const currentPerson = snapshot.people.find(
+      (person) => person.id === currentPersonId,
+    );
+
+    if (currentPerson?.role !== "organizer") {
+      throw new Error("Palacinkové balíčky môže meniť iba organizátor.");
+    }
+
+    if (snapshot.event.status === "released") {
+      throw new Error("Palacinková burza je už otvorená.");
+    }
+
+    const normalized = validatePancakeCatalog(packages);
+    snapshot.pancakePackages = normalized.map((item) => ({
+      ...item,
+      id: `pancake-package-${item.position}`,
+      eventId: snapshot.event.id,
+    }));
+    this.write(snapshot);
+    return structuredClone(snapshot.pancakePackages);
+  }
+
+  async selectPancakePackage(
+    packageId: string,
+  ): Promise<TeamPancakeSelection> {
+    const snapshot = this.read();
+
+    if (snapshot.event.status !== "released") {
+      throw new Error("Palacinková burza ešte nie je otvorená.");
+    }
+
+    const currentPersonId = this.storage.getItem(PERSON_KEY);
+    const person = snapshot.people.find(
+      (candidate) => candidate.id === currentPersonId,
+    );
+    if (!person) {
+      throw new Error("Najprv sa prihlás.");
+    }
+    if (person.role === "organizer") {
+      throw new Error("Organizátor nemôže vyberať za tím.");
+    }
+
+    const membership = snapshot.teamMembers.find(
+      (candidate) => candidate.personId === person.id,
+    );
+    const team = snapshot.teams.find(
+      (candidate) =>
+        candidate.id === membership?.teamId && !candidate.archived,
+    );
+    if (!team) {
+      throw new Error("Nemáš priradený tím.");
+    }
+
+    const item = snapshot.pancakePackages.find(
+      (candidate) =>
+        candidate.id === packageId &&
+        candidate.eventId === snapshot.event.id,
+    );
+    if (!item) {
+      throw new Error("Palacinkový balíček neexistuje.");
+    }
+    if (!canTeamAffordPackage(team.id, item, snapshot)) {
+      throw new Error("Tím nemá dosť palaciniek.");
+    }
+
+    const existing = snapshot.pancakeSelections.find(
+      (selection) => selection.teamId === team.id,
+    );
+    const selection: TeamPancakeSelection = {
+      id: existing?.id ?? `pancake-selection-${team.id}`,
+      eventId: snapshot.event.id,
+      teamId: team.id,
+      packageId: item.id,
+      selectedBy: person.id,
+      selectedAt: new Date().toISOString(),
+    };
+    if (existing) {
+      Object.assign(existing, selection);
+    } else {
+      snapshot.pancakeSelections.push(selection);
+    }
+    this.write(snapshot);
+    return structuredClone(selection);
   }
 
   async updateEvent(

@@ -6,11 +6,17 @@ import { PublicSummary } from "./PublicSummary";
 describe("PublicSummary", () => {
   it("uses the configured currency after the aggregate amount", () => {
     const snapshot = createDemoSnapshot(new Date("2026-07-24T10:00:00Z"));
+    snapshot.event.status = "released";
     const stats = { ...snapshot.stats!, totalInvested: 420 };
 
     render(<PublicSummary event={snapshot.event} stats={stats} />);
 
     expect(screen.getByText("420🥞")).toBeInTheDocument();
     expect(screen.queryByText("🥞420")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Nugátová plnka + jahodový kompót"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Vybrané pre tím")).not.toBeInTheDocument();
+    expect(screen.queryByText(/rank|miesto|víťaz/i)).not.toBeInTheDocument();
   });
 });

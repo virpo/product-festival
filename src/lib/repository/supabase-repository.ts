@@ -4,6 +4,8 @@ import type {
   EventStatus,
   FestivalEvent,
   FestivalSnapshot,
+  PancakePackage,
+  PancakePackageDraft,
   Person,
   PersonRole,
   Signal,
@@ -11,8 +13,10 @@ import type {
   SignalSaveResult,
   Team,
   TeamMember,
+  TeamPancakeSelection,
   Visit,
 } from "@/lib/domain/types";
+import { validatePancakeCatalog } from "@/lib/domain/pancake-market";
 import {
   ACCESS_CODE_MAX_LENGTH,
   normalizeAccessCode,
@@ -210,6 +214,29 @@ function mapSignal(value: unknown): Signal {
   };
 }
 
+function mapPancakePackage(value: unknown): PancakePackage {
+  const row = value as Row;
+  return {
+    id: stringValue(row.id),
+    eventId: stringValue(row.event_id),
+    name: stringValue(row.name),
+    price: numberValue(row.price),
+    position: numberValue(row.position),
+  };
+}
+
+function mapPancakeSelection(value: unknown): TeamPancakeSelection {
+  const row = value as Row;
+  return {
+    id: stringValue(row.id),
+    eventId: stringValue(row.event_id),
+    teamId: stringValue(row.team_id),
+    packageId: stringValue(row.package_id),
+    selectedBy: stringValue(row.selected_by),
+    selectedAt: stringValue(row.selected_at),
+  };
+}
+
 function mapStats(value: unknown): EventStats | null {
   if (!value) return null;
   const row = value as Row;
@@ -346,6 +373,8 @@ export class SupabaseFestivalRepository implements FestivalRepository {
         teamMembers: [],
         visits: [],
         signals: [],
+        pancakePackages: [],
+        pancakeSelections: [],
         stats: mapStats(statsResponse.data),
       };
     }
@@ -356,18 +385,31 @@ export class SupabaseFestivalRepository implements FestivalRepository {
       membersResponse,
       visitsResponse,
       signalsResponse,
+      packagesResponse,
+      selectionsResponse,
     ] = await Promise.all([
       this.client.from("people").select("*").eq("event_id", event.id),
       this.client.from("access_codes").select("person_id, code").eq("event_id", event.id),
       this.client.from("team_members").select("*").eq("event_id", event.id),
       this.client.from("visits").select("*").eq("event_id", event.id),
       this.client.from("signals").select("*").eq("event_id", event.id),
+      this.client
+        .from("pancake_packages")
+        .select("*")
+        .eq("event_id", event.id)
+        .order("position"),
+      this.client
+        .from("team_pancake_selections")
+        .select("*")
+        .eq("event_id", event.id),
     ]);
     fail(peopleResponse.error, "Ľudia sa nepodarilo načítať.");
     fail(codesResponse.error, "Prístupové kódy sa nepodarilo načítať.");
     fail(membersResponse.error, "Tímy sa nepodarilo načítať.");
     fail(visitsResponse.error, "Návštevy sa nepodarilo načítať.");
     fail(signalsResponse.error, "Feedback sa nepodarilo načítať.");
+    fail(packagesResponse.error, "Palacinkové balíčky sa nepodarilo načítať.");
+    fail(selectionsResponse.error, "Palacinkové výbery sa nepodarilo načítať.");
     const codes = new Map(
       (codesResponse.data ?? []).map((value) => {
         const row = value as Row;
@@ -388,6 +430,10 @@ export class SupabaseFestivalRepository implements FestivalRepository {
       teamMembers: (membersResponse.data ?? []).map(mapMember),
       visits: (visitsResponse.data ?? []).map(mapVisit),
       signals,
+      pancakePackages: (packagesResponse.data ?? []).map(mapPancakePackage),
+      pancakeSelections: (selectionsResponse.data ?? []).map(
+        mapPancakeSelection,
+      ),
       stats: mapStats(statsResponse.data),
     };
   }
@@ -708,6 +754,31 @@ export class SupabaseFestivalRepository implements FestivalRepository {
       target_person_id: personId,
     });
     fail(error, "Človeka sa nepodarilo odstrániť.");
+  }
+
+  async savePancakeCatalog(
+    packages: PancakePackageDraft[],
+  ): Promise<PancakePackage[]> {
+    const event = await this.getEvent();
+    const normalized = validatePancakeCatalog(packages);
+    const { data, error } = await this.client.rpc("save_pancake_catalog", {
+      target_event_id: event.id,
+      target_packages: normalized,
+    });
+    fail(error, "Palacinkové balíčky sa nepodarilo uložiť.");
+    return (data ?? []).map(mapPancakePackage);
+  }
+
+  async selectPancakePackage(
+    packageId: string,
+  ): Promise<TeamPancakeSelection> {
+    const event = await this.getEvent();
+    const { data, error } = await this.client.rpc("select_pancake_package", {
+      target_event_id: event.id,
+      target_package_id: packageId,
+    });
+    fail(error, "Palacinkový balíček sa nepodarilo vybrať.");
+    return mapPancakeSelection(data);
   }
 
   async updateEvent(patch: Partial<FestivalEvent>): Promise<FestivalEvent> {

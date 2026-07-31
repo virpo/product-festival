@@ -133,6 +133,92 @@ describe("DemoFestivalRepository", () => {
     expect((await repo.getSnapshot()).event.status).toBe("released");
   });
 
+  it("configures the catalogue before release and freezes it afterward", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    const listener = vi.fn();
+    repo.subscribe(listener);
+    await repo.claimPerson("ADMIN");
+    const configured = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({
+        name,
+        position,
+        price: position === 6 ? 30 : position === 7 ? 20 : price,
+      }),
+    );
+
+    await expect(repo.savePancakeCatalog(configured)).resolves.toHaveLength(7);
+    expect(
+      (await repo.getSnapshot()).pancakePackages.map((item) => item.price),
+    ).toEqual([700, 600, 500, 400, 300, 30, 20]);
+    expect(listener).toHaveBeenCalled();
+
+    await repo.advanceEvent("locked");
+    await repo.advanceEvent("released");
+    await expect(repo.savePancakeCatalog(configured)).rejects.toThrow(
+      "Palacinková burza je už otvorená.",
+    );
+  });
+
+  it("keeps one replaceable affordable selection for the member's team", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const configured = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({
+        name,
+        position,
+        price: position === 6 ? 30 : position === 7 ? 20 : price,
+      }),
+    );
+    await repo.savePancakeCatalog(configured);
+    await repo.advanceEvent("locked");
+    await repo.advanceEvent("released");
+    await repo.signOut();
+    const peter = await repo.claimPerson("PETER");
+    const packages = (await repo.getSnapshot()).pancakePackages;
+
+    await repo.selectPancakePackage(
+      packages.find((item) => item.position === 6)!.id,
+    );
+    await repo.selectPancakePackage(
+      packages.find((item) => item.position === 7)!.id,
+    );
+
+    expect((await repo.getSnapshot()).pancakeSelections).toEqual([
+      expect.objectContaining({
+        packageId: packages.find((item) => item.position === 7)!.id,
+        selectedBy: peter.id,
+        teamId: "team-1",
+      }),
+    ]);
+    await expect(
+      repo.selectPancakePackage(
+        packages.find((item) => item.position === 5)!.id,
+      ),
+    ).rejects.toThrow("Tím nemá dosť palaciniek.");
+  });
+
+  it("requires a team and restores market defaults on reset", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    await repo.advanceEvent("locked");
+    await repo.advanceEvent("released");
+    await repo.signOut();
+    await repo.claimPerson("MENTOR");
+
+    await expect(
+      repo.selectPancakePackage(
+        (await repo.getSnapshot()).pancakePackages[6].id,
+      ),
+    ).rejects.toThrow("Nemáš priradený tím.");
+
+    await repo.resetDemo();
+    const reset = await repo.getSnapshot();
+    expect(reset.pancakePackages.map((item) => item.price)).toEqual([
+      700, 600, 500, 400, 300, 200, 100,
+    ]);
+    expect(reset.pancakeSelections).toEqual([]);
+  });
+
   it("clears private bonuses when resetting demo data", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     const person = await repo.claimPerson("NINA");

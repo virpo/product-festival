@@ -32,6 +32,10 @@ const walletCoversSignalsMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607310001_wallet_covers_signals.sql",
 );
+const pancakeMarketMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310004_pancake_market.sql",
+);
 
 describe("Supabase schema contract", () => {
   it("defines protected tables and aggregate realtime state", () => {
@@ -210,4 +214,44 @@ describe("Supabase schema contract", () => {
     expect(sql).toContain("where slug = 'ai-build-week'");
     expect(sql).toContain("and currency = '$'");
   });
+  it("keeps the pancake market private and atomic", () => {
+    const sql = readFileSync(pancakeMarketMigrationPath, "utf8").toLowerCase();
+
+    expect(sql).toContain("create table public.pancake_packages");
+    expect(sql).toContain("create table public.team_pancake_selections");
+    expect(sql).toContain(
+      "alter table public.pancake_packages enable row level security",
+    );
+    expect(sql).toContain(
+      "alter table public.team_pancake_selections enable row level security",
+    );
+    expect(sql).toContain(
+      "create or replace function public.save_pancake_catalog",
+    );
+    expect(sql).toContain(
+      "create or replace function public.select_pancake_package",
+    );
+    expect(sql).toContain("status = 'released'");
+    expect(sql).toContain("public.current_person_id");
+    expect(sql).toContain("public.is_organizer");
+    expect(sql).toContain(
+      "membership.event_id = pancake_packages.event_id",
+    );
+    expect(sql).toContain(
+      "public.current_person_id(pancake_packages.event_id)",
+    );
+    expect(sql).toContain(
+      "revoke insert, update, delete on public.pancake_packages",
+    );
+    expect(sql).toContain(
+      "revoke insert, update, delete on public.team_pancake_selections",
+    );
+    expect(sql).not.toContain(
+      "alter publication supabase_realtime add table public.pancake_packages",
+    );
+    expect(sql).not.toContain(
+      "alter publication supabase_realtime add table public.team_pancake_selections",
+    );
+  });
+
 });

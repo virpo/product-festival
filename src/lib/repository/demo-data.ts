@@ -1,3 +1,4 @@
+import { DEFAULT_PANCAKE_PACKAGE_DRAFTS } from "@/lib/domain/pancake-market";
 import { deriveEventStats } from "@/lib/domain/stats";
 import type {
   FestivalSnapshot,
@@ -153,6 +154,12 @@ export function createDemoSnapshot(date = new Date()): FestivalSnapshot {
     teamMembers,
     visits,
     signals,
+    pancakePackages: DEFAULT_PANCAKE_PACKAGE_DRAFTS.map((item) => ({
+      ...item,
+      id: `pancake-package-${item.position}`,
+      eventId: "event-demo",
+    })),
+    pancakeSelections: [],
     stats: null,
   };
 

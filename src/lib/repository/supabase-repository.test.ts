@@ -270,4 +270,75 @@ describe("SupabaseFestivalRepository", () => {
       ["disconnected"],
     ]);
   });
+  it("saves a validated pancake catalogue through one RPC", async () => {
+    const { client } = fakeClient();
+    client.rpc.mockResolvedValueOnce({
+      data: [
+        {
+          id: "package-1",
+          event_id: "event-1",
+          name: "Nugát",
+          price: 700,
+          position: 1,
+        },
+      ],
+      error: null,
+    });
+    const repository = new SupabaseFestivalRepository(client as never, {
+      eventSlug: "ai-build-week",
+    });
+    const packages = [
+      { name: "Nugát", price: 700, position: 1 },
+      { name: "Orechy", price: 600, position: 2 },
+      { name: "Tvaroh", price: 500, position: 3 },
+      { name: "Mak", price: 400, position: 4 },
+      { name: "Káva", price: 300, position: 5 },
+      { name: "Gaštan", price: 200, position: 6 },
+      { name: "Bryndza", price: 100, position: 7 },
+    ];
+
+    await expect(repository.savePancakeCatalog(packages)).resolves.toEqual([
+      {
+        id: "package-1",
+        eventId: "event-1",
+        name: "Nugát",
+        price: 700,
+        position: 1,
+      },
+    ]);
+    expect(client.rpc).toHaveBeenCalledWith("save_pancake_catalog", {
+      target_event_id: "event-1",
+      target_packages: packages,
+    });
+  });
+
+  it("selects a pancake package through one team-scoped RPC", async () => {
+    const { client } = fakeClient();
+    client.rpc.mockResolvedValueOnce({
+      data: {
+        id: "selection-1",
+        event_id: "event-1",
+        team_id: "team-1",
+        package_id: "package-7",
+        selected_by: "person-1",
+        selected_at: "2026-07-31T12:00:00Z",
+      },
+      error: null,
+    });
+    const repository = new SupabaseFestivalRepository(client as never, {
+      eventSlug: "ai-build-week",
+    });
+
+    await expect(
+      repository.selectPancakePackage("package-7"),
+    ).resolves.toMatchObject({
+      teamId: "team-1",
+      packageId: "package-7",
+      selectedBy: "person-1",
+    });
+    expect(client.rpc).toHaveBeenCalledWith("select_pancake_package", {
+      target_event_id: "event-1",
+      target_package_id: "package-7",
+    });
+  });
 });
