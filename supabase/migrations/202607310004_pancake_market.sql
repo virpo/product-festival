@@ -333,7 +333,6 @@ set search_path = public
 as $$
 declare
   target_person public.people%rowtype;
-  event_row public.events%rowtype;
   caller_person_id uuid;
 begin
   select *
@@ -349,8 +348,7 @@ begin
     raise exception 'organizer_access_required';
   end if;
 
-  select *
-  into event_row
+  perform 1
   from public.events
   where id = target_person.event_id
   for update;
