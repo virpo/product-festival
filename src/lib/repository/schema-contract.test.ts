@@ -1,6 +1,6 @@
 // @vitest-environment node
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -35,6 +35,10 @@ const walletCoversSignalsMigrationPath = join(
 const pancakeMarketMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202607310004_pancake_market.sql",
+);
+const pancakeMarketHardeningMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202607310005_harden_pancake_market.sql",
 );
 
 describe("Supabase schema contract", () => {
@@ -252,6 +256,48 @@ describe("Supabase schema contract", () => {
     expect(sql).not.toContain(
       "alter publication supabase_realtime add table public.team_pancake_selections",
     );
+  });
+
+  it("ships pancake hardening after the already-released market migration", () => {
+    expect(
+      existsSync(pancakeMarketHardeningMigrationPath),
+      "pancake hardening must use a new migration version",
+    ).toBe(true);
+    if (!existsSync(pancakeMarketHardeningMigrationPath)) return;
+
+    const releasedSql = readFileSync(
+      pancakeMarketMigrationPath,
+      "utf8",
+    ).toLowerCase();
+    const hardeningSql = readFileSync(
+      pancakeMarketHardeningMigrationPath,
+      "utf8",
+    ).toLowerCase();
+
+    expect(releasedSql).not.toContain("target_expected_packages jsonb");
+    expect(releasedSql).not.toContain(
+      "person_with_pancake_selection_cannot_be_removed",
+    );
+    expect(releasedSql).toContain(
+      "grant execute on function public.save_pancake_catalog(uuid, jsonb) to authenticated",
+    );
+
+    expect(hardeningSql).toContain("target_expected_packages jsonb");
+    expect(hardeningSql).toContain("pancake_catalog_stale");
+    expect(hardeningSql).toContain(
+      "person_with_pancake_selection_cannot_be_removed",
+    );
+    expect(hardeningSql).toContain(
+      "drop function if exists public.save_pancake_catalog(uuid, jsonb)",
+    );
+    expect(hardeningSql).toContain(
+      "grant execute on function public.save_pancake_catalog(uuid, jsonb, jsonb) to authenticated",
+    );
+    expect(
+      hardeningSql.match(
+        /update public\.events\s+set updated_at = now\(\)\s+where id = target_event_id;/g,
+      ),
+    ).toHaveLength(2);
   });
 
 });

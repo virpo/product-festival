@@ -76,6 +76,7 @@ export type FestivalRepository = {
   removePerson(personId: string): Promise<void>;
   savePancakeCatalog(
     packages: PancakePackageDraft[],
+    expectedPackages: PancakePackageDraft[],
   ): Promise<PancakePackage[]>;
   selectPancakePackage(packageId: string): Promise<TeamPancakeSelection>;
   updateEvent(patch: Partial<FestivalEvent>): Promise<FestivalEvent>;

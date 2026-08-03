@@ -64,7 +64,7 @@ export default function ResultsPage() {
       {team ? (
         <TeamReceipt
           onSelectPackage={
-            currentPerson.role === "organizer"
+            currentPerson.role === "organizer" || team.archived
               ? undefined
               : commands.selectPancakePackage
           }

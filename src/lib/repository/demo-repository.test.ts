@@ -138,15 +138,18 @@ describe("DemoFestivalRepository", () => {
     const listener = vi.fn();
     repo.subscribe(listener);
     await repo.claimPerson("ADMIN");
-    const configured = (await repo.getSnapshot()).pancakePackages.map(
-      ({ name, position, price }) => ({
-        name,
-        position,
-        price: position === 6 ? 30 : position === 7 ? 20 : price,
-      }),
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
     );
+    const configured = original.map((item) => ({
+      ...item,
+      price:
+        item.position === 6 ? 30 : item.position === 7 ? 20 : item.price,
+    }));
 
-    await expect(repo.savePancakeCatalog(configured)).resolves.toHaveLength(7);
+    await expect(
+      repo.savePancakeCatalog(configured, original),
+    ).resolves.toHaveLength(7);
     expect(
       (await repo.getSnapshot()).pancakePackages.map((item) => item.price),
     ).toEqual([700, 600, 500, 400, 300, 30, 20]);
@@ -154,22 +157,113 @@ describe("DemoFestivalRepository", () => {
 
     await repo.advanceEvent("locked");
     await repo.advanceEvent("released");
-    await expect(repo.savePancakeCatalog(configured)).rejects.toThrow(
+    await expect(
+      repo.savePancakeCatalog(configured, configured),
+    ).rejects.toThrow(
       "Palacinková burza je už otvorená.",
     );
+  });
+
+  it("rejects a catalogue save from a stale organizer draft", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const firstSave = original.map((item) => ({
+      ...item,
+      name: item.position === 1 ? "Prvý nugát" : item.name,
+    }));
+    const staleSave = original.map((item) => ({
+      ...item,
+      name: item.position === 1 ? "Starý nugát" : item.name,
+    }));
+
+    await repo.savePancakeCatalog(firstSave, original);
+
+    await expect(
+      repo.savePancakeCatalog(staleSave, original),
+    ).rejects.toThrow(
+      "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+    );
+    expect((await repo.getSnapshot()).pancakePackages[0].name).toBe(
+      "Prvý nugát",
+    );
+  });
+
+  it("rechecks the catalogue after acquiring the cross-tab lock", async () => {
+    const storage = memoryStorage();
+    const repo = new DemoFestivalRepository(storage);
+    await repo.claimPerson("ADMIN");
+    const snapshot = await repo.getSnapshot();
+    const original = snapshot.pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const staleSave = original.map((item) => ({
+      ...item,
+      name: item.position === 1 ? "Starý nugát" : item.name,
+    }));
+    snapshot.pancakePackages[0].name = "Novší nugát";
+    const request = vi.fn(
+      async (
+        _name: string,
+        callback: () => unknown | Promise<unknown>,
+      ) => {
+        storage.setItem(
+          "product-festival:demo:v1",
+          JSON.stringify(snapshot),
+        );
+        return callback();
+      },
+    );
+    Object.defineProperty(navigator, "locks", {
+      configurable: true,
+      value: { request },
+    });
+
+    try {
+      await expect(
+        repo.savePancakeCatalog(staleSave, original),
+      ).rejects.toThrow(
+        "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+      );
+      expect(request).toHaveBeenCalledOnce();
+    } finally {
+      Object.defineProperty(navigator, "locks", {
+        configurable: true,
+        value: undefined,
+      });
+    }
+  });
+
+  it("rejects prices above the PostgreSQL integer range", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const tooLarge = original.map((item) => ({
+      ...item,
+      price: item.position === 1 ? 2_147_483_648 : item.price,
+    }));
+
+    await expect(
+      repo.savePancakeCatalog(tooLarge, original),
+    ).rejects.toThrow("2 147 483 647");
   });
 
   it("keeps one replaceable affordable selection for the member's team", async () => {
     const repo = new DemoFestivalRepository(memoryStorage());
     await repo.claimPerson("ADMIN");
-    const configured = (await repo.getSnapshot()).pancakePackages.map(
-      ({ name, position, price }) => ({
-        name,
-        position,
-        price: position === 6 ? 30 : position === 7 ? 20 : price,
-      }),
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
     );
-    await repo.savePancakeCatalog(configured);
+    const configured = original.map((item) => ({
+      ...item,
+      price:
+        item.position === 6 ? 30 : item.position === 7 ? 20 : item.price,
+    }));
+    await repo.savePancakeCatalog(configured, original);
     await repo.advanceEvent("locked");
     await repo.advanceEvent("released");
     await repo.signOut();
@@ -195,6 +289,34 @@ describe("DemoFestivalRepository", () => {
         packages.find((item) => item.position === 5)!.id,
       ),
     ).rejects.toThrow("Tím nemá dosť palaciniek.");
+  });
+
+  it("does not remove the person who chose the team package", async () => {
+    const repo = new DemoFestivalRepository(memoryStorage());
+    await repo.claimPerson("ADMIN");
+    const original = (await repo.getSnapshot()).pancakePackages.map(
+      ({ name, position, price }) => ({ name, position, price }),
+    );
+    const configured = original.map((item) => ({
+      ...item,
+      price: item.position === 7 ? 20 : item.price,
+    }));
+    await repo.savePancakeCatalog(configured, original);
+    await repo.advanceEvent("locked");
+    await repo.advanceEvent("released");
+    await repo.signOut();
+    const ada = await repo.claimPerson("ADA");
+    await repo.selectPancakePackage(
+      (await repo.getSnapshot()).pancakePackages.find(
+        (item) => item.position === 7,
+      )!.id,
+    );
+    await repo.signOut();
+    await repo.claimPerson("ADMIN");
+
+    await expect(repo.removePerson(ada.id)).rejects.toThrow(
+      "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
+    );
   });
 
   it("requires a team and restores market defaults on reset", async () => {

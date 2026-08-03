@@ -1,5 +1,6 @@
 import {
   DEFAULT_PANCAKE_PACKAGE_DRAFTS,
+  PANCAKE_CATALOG_STALE_MESSAGE,
   canTeamAffordPackage,
   validatePancakeCatalog,
 } from "@/lib/domain/pancake-market";
@@ -624,6 +625,16 @@ export class DemoFestivalRepository implements FestivalRepository {
       throw new Error("Človeka so spätnou väzbou už nemožno odstrániť.");
     }
 
+    if (
+      snapshot.pancakeSelections.some(
+        (selection) => selection.selectedBy === personId,
+      )
+    ) {
+      throw new Error(
+        "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
+      );
+    }
+
     snapshot.people = snapshot.people.filter((person) => person.id !== personId);
     snapshot.teamMembers = snapshot.teamMembers.filter(
       (membership) => membership.personId !== personId,
@@ -657,31 +668,57 @@ export class DemoFestivalRepository implements FestivalRepository {
     }
   }
 
+  private async withPancakeCatalogLock<T>(
+    action: () => T | Promise<T>,
+  ): Promise<T> {
+    const locks =
+      typeof navigator === "undefined" ? undefined : navigator.locks;
+
+    return locks
+      ? locks.request(`${CHANNEL_NAME}:pancake-catalog`, () => action())
+      : action();
+  }
+
   async savePancakeCatalog(
     packages: PancakePackageDraft[],
+    expectedPackages: PancakePackageDraft[],
   ): Promise<PancakePackage[]> {
-    const snapshot = this.read();
-    const currentPersonId = this.storage.getItem(PERSON_KEY);
-    const currentPerson = snapshot.people.find(
-      (person) => person.id === currentPersonId,
-    );
+    return this.withPancakeCatalogLock(() => {
+      const snapshot = this.read();
+      const currentPersonId = this.storage.getItem(PERSON_KEY);
+      const currentPerson = snapshot.people.find(
+        (person) => person.id === currentPersonId,
+      );
 
-    if (currentPerson?.role !== "organizer") {
-      throw new Error("Palacinkové balíčky môže meniť iba organizátor.");
-    }
+      if (currentPerson?.role !== "organizer") {
+        throw new Error("Palacinkové balíčky môže meniť iba organizátor.");
+      }
 
-    if (snapshot.event.status === "released") {
-      throw new Error("Palacinková burza je už otvorená.");
-    }
+      if (snapshot.event.status === "released") {
+        throw new Error("Palacinková burza je už otvorená.");
+      }
 
-    const normalized = validatePancakeCatalog(packages);
-    snapshot.pancakePackages = normalized.map((item) => ({
-      ...item,
-      id: `pancake-package-${item.position}`,
-      eventId: snapshot.event.id,
-    }));
-    this.write(snapshot);
-    return structuredClone(snapshot.pancakePackages);
+      const normalizedExpected = validatePancakeCatalog(expectedPackages);
+      const current = validatePancakeCatalog(
+        snapshot.pancakePackages.map(({ name, position, price }) => ({
+          name,
+          position,
+          price,
+        })),
+      );
+      if (JSON.stringify(current) !== JSON.stringify(normalizedExpected)) {
+        throw new Error(PANCAKE_CATALOG_STALE_MESSAGE);
+      }
+
+      const normalized = validatePancakeCatalog(packages);
+      snapshot.pancakePackages = normalized.map((item) => ({
+        ...item,
+        id: `pancake-package-${item.position}`,
+        eventId: snapshot.event.id,
+      }));
+      this.write(snapshot);
+      return structuredClone(snapshot.pancakePackages);
+    });
   }
 
   async selectPancakePackage(

@@ -2,6 +2,8 @@
 
 import { formatCredits } from "@/lib/domain/credits";
 import {
+  MAX_PANCAKE_PACKAGE_PRICE,
+  PANCAKE_CATALOG_STALE_MESSAGE,
   teamReceivedAmount,
   validatePancakeCatalog,
 } from "@/lib/domain/pancake-market";
@@ -14,7 +16,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 type PancakeMarketAdminProps = {
   snapshot: FestivalSnapshot;
-  onSave: (packages: PancakePackageDraft[]) => Promise<void>;
+  onSave: (
+    packages: PancakePackageDraft[],
+    expectedPackages: PancakePackageDraft[],
+  ) => Promise<void>;
 };
 
 function sortedDrafts(snapshot: FestivalSnapshot): PancakePackageDraft[] {
@@ -42,6 +47,8 @@ export function PancakeMarketAdmin({
   const persistedSignature = catalogueSignature(persistedDrafts);
   const appliedSignature = useRef(persistedSignature);
   const latestPersistedSignature = useRef(persistedSignature);
+  const latestPersistedDrafts = useRef(persistedDrafts);
+  const appliedDrafts = useRef(persistedDrafts);
   const [drafts, setDrafts] = useState(persistedDrafts);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -54,8 +61,10 @@ export function PancakeMarketAdmin({
 
   useLayoutEffect(() => {
     latestPersistedSignature.current = persistedSignature;
+    latestPersistedDrafts.current = persistedDrafts;
     if (!dirty && appliedSignature.current !== persistedSignature) {
       setDrafts(persistedDrafts);
+      appliedDrafts.current = persistedDrafts;
       appliedSignature.current = persistedSignature;
     }
   }, [dirty, persistedDrafts, persistedSignature]);
@@ -107,13 +116,31 @@ export function PancakeMarketAdmin({
 
     setSaving(true);
     try {
-      await onSave(normalized);
-      appliedSignature.current = latestPersistedSignature.current;
-      setDrafts(normalized);
+      const submittedSignature = catalogueSignature(normalized);
+      await onSave(normalized, appliedDrafts.current);
+      const latestSignature = latestPersistedSignature.current;
+      const useLatestPersisted =
+        latestSignature !== appliedSignature.current &&
+        latestSignature !== submittedSignature;
+      const applied = useLatestPersisted
+        ? latestPersistedDrafts.current
+        : normalized;
+      appliedSignature.current = latestSignature;
+      appliedDrafts.current = applied;
+      setDrafts(applied);
       setDirty(false);
-      setMessage("Palacinkové balíčky sú uložené.");
-    } catch {
-      setError("Nastavenia sa nepodarilo uložiť. Skús to znova.");
+      setMessage(
+        useLatestPersisted
+          ? "Balíčky boli uložené a potom zmenené iným organizátorom."
+          : "Palacinkové balíčky sú uložené.",
+      );
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error &&
+          saveError.message === PANCAKE_CATALOG_STALE_MESSAGE
+          ? PANCAKE_CATALOG_STALE_MESSAGE
+          : "Nastavenia sa nepodarilo uložiť. Skús to znova.",
+      );
     } finally {
       setSaving(false);
     }
@@ -246,6 +273,7 @@ export function PancakeMarketAdmin({
                     className="field-input"
                     inputMode="numeric"
                     min="1"
+                    max={MAX_PANCAKE_PACKAGE_PRICE}
                     onChange={(event) =>
                       updateDraft(index, { price: Number(event.target.value) })
                     }

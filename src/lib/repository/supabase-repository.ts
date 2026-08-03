@@ -16,7 +16,10 @@ import type {
   TeamPancakeSelection,
   Visit,
 } from "@/lib/domain/types";
-import { validatePancakeCatalog } from "@/lib/domain/pancake-market";
+import {
+  PANCAKE_CATALOG_STALE_MESSAGE,
+  validatePancakeCatalog,
+} from "@/lib/domain/pancake-market";
 import {
   ACCESS_CODE_MAX_LENGTH,
   normalizeAccessCode,
@@ -67,10 +70,13 @@ const RPC_ERROR_MESSAGES: Record<string, string> = {
   membership_locked_after_signal:
     "Tím sa už nedá zmeniť — tento človek už poslal feedback.",
   organizer_access_required: "Túto akciu môže vykonať iba organizátor.",
+  pancake_catalog_stale: PANCAKE_CATALOG_STALE_MESSAGE,
   person_name_required: "Meno nemôže byť prázdne.",
   person_not_found: "Človek sa nenašiel.",
   person_with_feedback_cannot_be_removed:
     "Človeka, ktorý už poslal feedback, nemôžeš odstrániť.",
+  person_with_pancake_selection_cannot_be_removed:
+    "Človeka, ktorý vybral palacinkový balíček, nemožno odstrániť.",
   team_not_available: "Tím nie je dostupný.",
   unknown_access_code: "Tento prístupový kód neexistuje.",
   visits_closed: "Návštevy sa dajú zapisovať iba počas otvoreného eventu.",
@@ -758,12 +764,15 @@ export class SupabaseFestivalRepository implements FestivalRepository {
 
   async savePancakeCatalog(
     packages: PancakePackageDraft[],
+    expectedPackages: PancakePackageDraft[],
   ): Promise<PancakePackage[]> {
     const event = await this.getEvent();
     const normalized = validatePancakeCatalog(packages);
+    const normalizedExpected = validatePancakeCatalog(expectedPackages);
     const { data, error } = await this.client.rpc("save_pancake_catalog", {
       target_event_id: event.id,
       target_packages: normalized,
+      target_expected_packages: normalizedExpected,
     });
     fail(error, "Palacinkové balíčky sa nepodarilo uložiť.");
     return (data ?? []).map(mapPancakePackage);

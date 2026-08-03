@@ -39,6 +39,10 @@ describe("PancakeMarketAdmin", () => {
     expect(
       screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
     ).toBeEnabled();
+    expect(screen.getByLabelText("Cena balíčka 1")).toHaveAttribute(
+      "max",
+      "2147483647",
+    );
   });
 
   it("validates descending prices before saving", async () => {
@@ -87,7 +91,68 @@ describe("PancakeMarketAdmin", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "Peterov nugát", position: 1 }),
       ]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Nugátová plnka + jahodový kompót",
+          position: 1,
+        }),
+      ]),
     );
+  });
+
+  it("saves against the catalogue that the dirty draft started from", async () => {
+    const user = userEvent.setup();
+    const snapshot = snapshotAt("open");
+    const onSave = vi.fn().mockRejectedValue(new Error("stale"));
+    const view = render(
+      <PancakeMarketAdmin onSave={onSave} snapshot={snapshot} />,
+    );
+    const firstName = screen.getByLabelText("Názov balíčka 1");
+    await user.clear(firstName);
+    await user.type(firstName, "Peterov nugát");
+
+    const remote = structuredClone(snapshot);
+    remote.pancakePackages[0].name = "Vzdialený nugát";
+    view.rerender(<PancakeMarketAdmin onSave={onSave} snapshot={remote} />);
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Peterov nugát", position: 1 }),
+      ]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Nugátová plnka + jahodový kompót",
+          position: 1,
+        }),
+      ]),
+    );
+  });
+
+  it("explains a stale catalogue conflict without discarding the draft", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn().mockRejectedValue(
+      new Error(
+        "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+      ),
+    );
+    render(<PancakeMarketAdmin onSave={onSave} snapshot={snapshotAt("open")} />);
+    const firstName = screen.getByLabelText("Názov balíčka 1");
+    await user.clear(firstName);
+    await user.type(firstName, "Peterov nugát");
+
+    await user.click(
+      screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
+    );
+
+    expect(
+      screen.getByText(
+        "Katalóg sa medzitým zmenil. Obnov stránku a zopakuj úpravy.",
+      ),
+    ).toBeInTheDocument();
+    expect(firstName).toHaveValue("Peterov nugát");
   });
 
   it("moves complete package rows and rewrites positions", async () => {
@@ -134,7 +199,7 @@ describe("PancakeMarketAdmin", () => {
     ).toBeInTheDocument();
   });
 
-  it("does not apply a catalogue snapshot already seen during a save", async () => {
+  it("applies a newer catalogue that arrives before save completion", async () => {
     const user = userEvent.setup();
     const snapshot = snapshotAt("open");
     let resolveSave!: () => void;
@@ -155,21 +220,23 @@ describe("PancakeMarketAdmin", () => {
       screen.getByRole("button", { name: "Uložiť nastavenia burzy" }),
     );
 
-    const alreadySeen = structuredClone(snapshot);
-    alreadySeen.pancakePackages[0].name = "Stará vzdialená hodnota";
+    const newer = structuredClone(snapshot);
+    newer.pancakePackages[0].name = "Novší vzdialený nugát";
     view.rerender(
-      <PancakeMarketAdmin onSave={onSave} snapshot={alreadySeen} />,
+      <PancakeMarketAdmin onSave={onSave} snapshot={newer} />,
     );
 
     await act(async () => resolveSave());
 
     await waitFor(() =>
       expect(screen.getByLabelText("Názov balíčka 1")).toHaveValue(
-        "Peterov nugát",
+        "Novší vzdialený nugát",
       ),
     );
     expect(
-      screen.getByText("Palacinkové balíčky sú uložené."),
+      screen.getByText(
+        "Balíčky boli uložené a potom zmenené iným organizátorom.",
+      ),
     ).toBeInTheDocument();
   });
 

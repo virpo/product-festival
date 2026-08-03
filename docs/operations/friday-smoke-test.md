@@ -4,14 +4,19 @@ Run this before people enter the room.
 
 ## Deploy order
 
-The frontend degrades quietly if it runs ahead of the schema: missing
-`event_stats` columns map to zero, so the wall hides its progress bar and falls
-back to the legacy invested total instead of reporting an error.
+The aggregate-stats frontend degrades quietly if it runs ahead of migrations
+`202607300001`–`202607310003`: missing `event_stats` columns map to zero, so the
+wall hides its progress bar and falls back to the legacy invested total. The
+pancake market does **not** degrade quietly: authenticated snapshot loading
+requires the tables from `202607310004`, and concurrent writes require the
+hardened RPCs from `202607310005`.
 
-- [ ] Apply `202607300001_investment_progress.sql` and
+- [ ] Apply `202607300001_investment_progress.sql`,
   `202607310001_wallet_covers_signals.sql`,
-  `202607310002_festival_sparks.sql`, and
-  `202607310003_qualify_festival_sparks.sql` **before** deploying the frontend.
+  `202607310002_festival_sparks.sql`,
+  `202607310003_qualify_festival_sparks.sql`,
+  `202607310004_pancake_market.sql`, and
+  `202607310005_harden_pancake_market.sql` **before** deploying the frontend.
 - [ ] Preflight before pushing. A fresh clone has no project ref (`supabase/.temp/`
   is gitignored), and `db push` replays every migration the remote has no record
   of — including `202607240001`, whose bare `create type` / `create table`
@@ -22,12 +27,22 @@ back to the legacy invested total instead of reporting an error.
   npx supabase migration list
   ```
 
-  Only `202607300001`, `202607310001`, `202607310002`, and `202607310003` may
-  show as pending. If an earlier version shows pending, it is a history gap,
-  not missing schema — reconcile it with
+  Only `202607300001`, `202607310001`, `202607310002`, `202607310003`,
+  `202607310004`, and `202607310005` may show as pending. If an earlier version
+  shows pending, it is a history gap, not missing schema — reconcile it with
   `npx supabase migration repair --status applied <version>` rather than
   letting the push replay it. Then `npx supabase db push`.
-- [ ] On an unlinked machine, paste the two files into the SQL editor instead.
+- [ ] On an unlinked machine, paste every pending migration file into the SQL
+  editor in version order instead.
+- [ ] Never edit `202607310004` in place. Environments that already applied it
+  will not run it again; `202607310005` upgrades those databases forward.
+- [ ] Exercise the complete migration chain locally before the remote push.
+  This executes the PL/pgSQL and RLS that string-contract tests only inspect:
+
+  ```sh
+  npx supabase db reset
+  npx supabase db lint
+  ```
 - [ ] `202607310001` sets a 3s `lock_timeout` on purpose, so creating its trigger
   fails fast instead of queueing ahead of every reader of `public.people`. Under
   load it can abort with `canceling statement due to lock timeout`. That is
